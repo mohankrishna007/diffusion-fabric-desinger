@@ -1,0 +1,83 @@
+# Pipeline configuration
+# Manufacturing constraints and default settings for the fabric design pipeline
+
+pipeline:
+  name: "Diffusion Fabric Designer"
+  version: "1.0.0"
+  stage_count: 8
+
+# Global manufacturing constraints
+manufacturing:
+  min_line_width_pixels: 2
+  max_color_count: 16
+  max_image_width: 10000
+  max_image_height: 10000
+  border_tolerance_pixels: 0  # Zero tolerance for repeat boundaries
+  
+# Image processing defaults
+image:
+  default_dpi: 300
+  color_space: "RGB"
+  supported_formats:
+    - ".bmp"
+    - ".png"
+    - ".tiff"
+    - ".tif"
+    - ".jpg"
+    - ".jpeg"
+  output_format: ".bmp"
+
+# Stage-specific configurations
+stages:
+  stage_0:
+    name: "Input Acquisition"
+    timeout_seconds: 60
+    max_file_size_mb: 500
+    
+  stage_1:
+    name: "Canonical Normalization"
+    timeout_seconds: 120
+    target_dpi: 300
+    
+  stage_2:
+    name: "Structural Intent Definition"
+    timeout_seconds: 180
+    edge_detection_method: "canny"
+    canny_threshold1: 50
+    canny_threshold2: 150
+    
+  stage_3:
+    name: "Controlled Diffusion Refinement"
+    timeout_seconds: 1800  # 30 minutes
+    denoise_strength: 0.3  # Low to preserve structure
+    model: "stable-diffusion-v1.5"
+    use_controlnet: true
+    
+  stage_4:
+    name: "Repeat & Boundary Enforcement"
+    timeout_seconds: 120
+    border_tolerance: 0  # Zero tolerance
+    
+  stage_5:
+    name: "Manufacturing Geometry Cleanup"
+    timeout_seconds: 180
+    min_feature_width: 2
+    morphology_kernel_size: 3
+    remove_islands: true
+    
+  stage_6:
+    name: "Color & Thread Constraint Enforcement"
+    timeout_seconds: 120
+    max_colors: 16
+    quantization_method: "kmeans"
+    
+  stage_7:
+    name: "Pre-CAM Validation Firewall"
+    timeout_seconds: 60
+    zero_tolerance: true
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "structured"
+  output: "console"
