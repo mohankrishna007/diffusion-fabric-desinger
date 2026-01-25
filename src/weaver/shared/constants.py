@@ -20,19 +20,30 @@ STAGE_NAMES: Final[dict[int, str]] = {
     7: "Pre-CAM Validation Firewall"
 }
 
-# File formats
-SUPPORTED_INPUT_FORMATS: Final[list[str]] = [".bmp", ".png", ".tiff", ".tif", ".jpg", ".jpeg"]
+# File formats - LOSSLESS ONLY (Stage 0 mandate)
+# JPEG forbidden: lossy compression destroys thread-level precision for CAM
+LOSSLESS_INPUT_FORMATS: Final[list[str]] = [".bmp", ".png", ".tiff", ".tif"]
+SUPPORTED_INPUT_FORMATS: Final[list[str]] = LOSSLESS_INPUT_FORMATS  # Alias for backward compatibility
 CAM_OUTPUT_FORMAT: Final[str] = ".bmp"
 
 # Image processing defaults
 DEFAULT_DPI: Final[int] = 300
 DEFAULT_COLOR_SPACE: Final[str] = "RGB"
 
-# Manufacturing constraints (example values - should be loaded from config)
+# Manufacturing constraints - IMMUTABLE physical limits
+# These represent Jacquard loom capabilities and CAM system requirements
+# DO NOT make these configurable - they are engineering constraints
 MIN_LINE_WIDTH_PIXELS: Final[int] = 2
 MAX_COLOR_COUNT: Final[int] = 16
-MAX_IMAGE_WIDTH: Final[int] = 10000
-MAX_IMAGE_HEIGHT: Final[int] = 10000
+MAX_IMAGE_WIDTH: Final[int] = 10000  # Loom maximum width
+MAX_IMAGE_HEIGHT: Final[int] = 10000  # Loom maximum height
+
+# Stage 0 Input Acquisition - Manufacturing constraint thresholds
+MAX_MEGAPIXELS: Final[int] = 100  # 10000 x 10000 = loom limit
+MAX_FILE_SIZE_BYTES: Final[int] = 500 * 1024 * 1024  # 500 MB (resource protection)
+MAX_PIXEL_COUNT: Final[int] = MAX_MEGAPIXELS * 1_000_000
+MIN_DPI: Final[int] = 72  # Below this, thread precision is lost
+MAX_DPI: Final[int] = 1200  # Above this, loom cannot resolve
 
 # Validation
 BORDER_TOLERANCE_PIXELS: Final[int] = 0  # Zero tolerance for repeat boundaries
