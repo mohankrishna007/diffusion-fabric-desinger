@@ -93,7 +93,13 @@ All fields are **REQUIRED**. Missing metadata = immediate FAIL.
 - **image_path**: Must exist, must be a file
 - **dpi**: Integer in range [72, 1200]
 - **repeat_unit_px**: Both width and height > 0
-- **color_mode**: Must be in {"RGB", "RGBA", "L", "LA", "1", "P"}
+- **color_mode**: Must be in {"RGB", "RGBA", "L", "LA"}
+
+**Forbidden Color Modes**:
+- **"P" (palette-indexed)**: Requires palette interpretation, creates CAM ambiguity
+- **"1" (1-bit)**: Bit-depth assumptions leak into downstream stages
+
+**Rationale**: Stage 0 establishes unambiguous source of truth. Convert palette/1-bit images to RGB/L before pipeline entry.
 
 ### Allowed File Formats
 
@@ -171,9 +177,20 @@ raise InputFormatError(
 - DPI in range [72, 1200]
 - Repeat width/height > 0
 - Image path exists and is a file
-- Color mode in valid set
+- Color mode in valid set: {"RGB", "RGBA", "L", "LA"}
+
+**Forbidden Modes**: "P" (palette-indexed), "1" (1-bit) - ambiguous for manufacturing
 
 **Exceptions**: `InputSchemaError` (Pydantic ValidationError)
+
+```python
+# Palette-indexed rejection example
+details = {
+    "color_mode": "P",
+    "valid_modes": ["RGB", "RGBA", "L", "LA"],
+    "rationale": "Stage 0 requires unambiguous color representations. Palette-indexed (P) and 1-bit (1) modes create manufacturing ambiguity."
+}
+```
 
 ---
 
@@ -513,6 +530,10 @@ All manufacturing constraints defined in `src/weaver/shared/constants.py`:
 ```python
 # Lossless formats only (JPEG forbidden)
 LOSSLESS_INPUT_FORMATS: Final[list[str]] = [".bmp", ".png", ".tiff", ".tif"]
+
+# Unambiguous color modes only (P and 1 forbidden)
+VALID_COLOR_MODES: Final[set[str]] = {"RGB", "RGBA", "L", "LA"}
+# P (palette-indexed) and 1 (1-bit) create manufacturing ambiguity
 
 # Jacquard loom physical limits
 MAX_IMAGE_WIDTH: Final[int] = 10000   # Loom maximum width

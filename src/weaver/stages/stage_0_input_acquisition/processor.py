@@ -117,13 +117,28 @@ class Stage0Input(StageInput):
     @field_validator("color_mode")
     @classmethod
     def validate_color_mode(cls, v: str) -> str:
-        """Validate color mode is recognized."""
-        valid_modes = {"RGB", "RGBA", "L", "LA", "1", "P"}
+        """Validate color mode is unambiguous for manufacturing.
+        
+        FORBIDDEN MODES:
+        - "P" (palette-indexed): Requires palette interpretation, ambiguous for CAM
+        - "1" (1-bit): Bit-depth assumptions leak into downstream stages
+        
+        RATIONALE: Stage 0 establishes source of truth. Only unambiguous color
+        representations allowed. Convert P/1 to RGB/L before pipeline entry.
+        """
+        valid_modes = {"RGB", "RGBA", "L", "LA"}
         if v not in valid_modes:
+            forbidden_modes = {"P": "palette-indexed (convert to RGB before pipeline entry)",
+                             "1": "1-bit (convert to L or RGB before pipeline entry)"}
+            rationale = forbidden_modes.get(v, "not a recognized mode")
             raise InputSchemaError(
-                message=f"Invalid color mode: {v}",
+                message=f"Color mode '{v}' not allowed: {rationale}",
                 stage_number=0,
-                details={"color_mode": v, "valid_modes": list(valid_modes)}
+                details={
+                    "color_mode": v,
+                    "valid_modes": list(valid_modes),
+                    "rationale": "Stage 0 requires unambiguous color representations. Palette-indexed (P) and 1-bit (1) modes create manufacturing ambiguity."
+                }
             )
         return v
 

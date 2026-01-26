@@ -26,6 +26,10 @@ LOSSLESS_INPUT_FORMATS: Final[list[str]] = [".bmp", ".png", ".tiff", ".tif"]
 SUPPORTED_INPUT_FORMATS: Final[list[str]] = LOSSLESS_INPUT_FORMATS  # Alias for backward compatibility
 CAM_OUTPUT_FORMAT: Final[str] = ".bmp"
 
+# Color modes - UNAMBIGUOUS ONLY (Stage 0 mandate)
+# P (palette-indexed) and 1 (1-bit) forbidden: create manufacturing interpretation ambiguity
+VALID_COLOR_MODES: Final[set[str]] = {"RGB", "RGBA", "L", "LA"}
+
 # Image processing defaults
 DEFAULT_DPI: Final[int] = 300
 DEFAULT_COLOR_SPACE: Final[str] = "RGB"

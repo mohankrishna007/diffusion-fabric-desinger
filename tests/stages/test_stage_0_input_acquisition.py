@@ -268,7 +268,46 @@ class TestSchemaValidation:
                 color_mode="CMYK"  # Not in valid_modes
             )
         
-        assert "Invalid color mode" in str(exc_info.value)
+        assert "not allowed" in str(exc_info.value)
+    
+    def test_palette_mode_forbidden(self, valid_png_image: Path):
+        """
+        Test FAIL when color_mode is 'P' (palette-indexed).
+        
+        RATIONALE: Palette interpretation creates manufacturing ambiguity.
+        """
+        with pytest.raises(InputSchemaError) as exc_info:
+            Stage0Input(pipeline_id="test_001", stage_number=0,
+                image_path=str(valid_png_image),
+                dpi=300,
+                repeat_unit_px=RepeatUnit(width=200, height=200),
+                color_mode="P"  # Palette-indexed forbidden
+            )
+        
+        error = exc_info.value
+        assert "palette-indexed" in str(error).lower()
+        assert error.details["color_mode"] == "P"
+        assert "RGB" in error.details["valid_modes"]
+        assert "manufacturing ambiguity" in error.details["rationale"]
+    
+    def test_onebit_mode_forbidden(self, valid_png_image: Path):
+        """
+        Test FAIL when color_mode is '1' (1-bit).
+        
+        RATIONALE: 1-bit mode creates bit-depth assumptions that leak downstream.
+        """
+        with pytest.raises(InputSchemaError) as exc_info:
+            Stage0Input(pipeline_id="test_001", stage_number=0,
+                image_path=str(valid_png_image),
+                dpi=300,
+                repeat_unit_px=RepeatUnit(width=200, height=200),
+                color_mode="1"  # 1-bit forbidden
+            )
+        
+        error = exc_info.value
+        assert "1-bit" in str(error).lower()
+        assert error.details["color_mode"] == "1"
+        assert "manufacturing ambiguity" in error.details["rationale"]
     
     def test_dpi_below_minimum(self, valid_png_image: Path):
         """Test FAIL when DPI is below minimum."""
