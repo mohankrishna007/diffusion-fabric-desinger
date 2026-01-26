@@ -8,6 +8,7 @@ from weaver.orchestrator.pipeline_engine import PipelineEngine
 from weaver.shared.schemas import (
     PipelineExecutionRequest,
     PipelineExecutionResponse,
+    PipelineSyncExecutionResponse,
     PipelineStatusResponse,
     PipelineStatus
 )
@@ -72,13 +73,75 @@ async def execute_pipeline(
         )
 
 
-@router.post("/execute/sync", response_model=Dict[str, Any])
+@router.post("/execute/sync", 
+             response_model=PipelineSyncExecutionResponse,
+             responses={
+                 200: {
+                     "description": "Pipeline executed successfully",
+                     "model": PipelineSyncExecutionResponse
+                 },
+                 400: {
+                     "description": "Bad request - Invalid input parameters",
+                     "content": {
+                         "application/json": {
+                             "example": {
+                                 "detail": {
+                                     "message": "Invalid configuration",
+                                     "details": {"error": "DPI must be between 72 and 1200"}
+                                 }
+                             }
+                         }
+                     }
+                 },
+                 422: {
+                     "description": "Unprocessable Entity - Pipeline execution failed",
+                     "content": {
+                         "application/json": {
+                             "example": {
+                                 "detail": {
+                                     "message": "Pipeline execution failed at stage 0",
+                                     "details": {
+                                         "pipeline_id": "550e8400-e29b-41d4-a716-446655440000",
+                                         "error": "File format '.jpg' not allowed. Only lossless formats permitted: ['.bmp', '.png', '.tiff', '.tif']",
+                                         "completed_stages": []
+                                     }
+                                 }
+                             }
+                         }
+                     }
+                 },
+                 500: {
+                     "description": "Internal Server Error",
+                     "content": {
+                         "application/json": {
+                             "example": {
+                                 "detail": "Unexpected error: Internal server failure"
+                             }
+                         }
+                     }
+                 }
+             })
 async def execute_pipeline_sync(request: PipelineExecutionRequest):
     """
     Execute the pipeline synchronously (blocking).
     
     This endpoint blocks until pipeline execution completes.
     Use for testing or when immediate results are required.
+    
+    **Input Requirements:**
+    - source_file: Must be lossless format (.bmp, .png, .tiff, .tif)
+    - config.dpi: 72-1200 (default: 300)
+    - config.color_mode: RGB, RGBA, L, or LA (default: RGB)
+    - config.repeat_unit: width/height must divide image dimensions evenly
+    - Max image size: 10,000 x 10,000 pixels (100 megapixels)
+    - Max file size: 500 MB
+    
+    **Returns:**
+    Complete pipeline execution result with:
+    - Pipeline ID and status
+    - Final result with output file path
+    - All stage outputs
+    - Execution timestamps
     
     Args:
         request: Pipeline execution request
@@ -93,7 +156,17 @@ async def execute_pipeline_sync(request: PipelineExecutionRequest):
         )
         
         logger.info(f"Pipeline executed successfully: {result['pipeline_id']}")
-        return result
+        
+        # Convert to response model
+        return PipelineSyncExecutionResponse(
+            pipeline_id=result["pipeline_id"],
+            status=result["status"],
+            source_file=result["source_file"],
+            result=result["result"],
+            stage_outputs=result.get("stage_outputs", {}),
+            created_at=result["created_at"],
+            completed_at=result["completed_at"]
+        )
     
     except PipelineExecutionError as e:
         logger.error(f"Pipeline execution failed: {str(e)}")
