@@ -51,6 +51,7 @@ from weaver.shared.constants import (
     MAX_MEGAPIXELS,
     MAX_FILE_SIZE_BYTES,
     MAX_PIXEL_COUNT,
+    MAX_DECODE_MEMORY_BYTES,
     MIN_DPI,
     MAX_DPI,
 )
@@ -186,14 +187,15 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
     
     VALIDATION STEPS (executed in order, FAIL-FAST):
     1. Schema validation (Pydantic pre-validates)
-    2. Image decode (lossless formats only)
-    3. Format allowlist enforcement
-    4. Metadata consistency check
-    5. Dimensional sanity checks
-    6. Repeat integrity verification
-    7. Resource protection
-    8. Source-of-truth sealing (hash + persist)
-    9. Emit canonical Input Descriptor
+    2. Pre-decode resource guard (OOM protection)
+    3. Image decode (lossless formats only)
+    4. Format allowlist enforcement
+    5. Metadata consistency check
+    6. Dimensional sanity checks
+    7. Repeat integrity verification
+    8. Resource protection (post-decode)
+    9. Source-of-truth sealing (hash + persist)
+    10. Emit canonical Input Descriptor
     
     MANUFACTURING RATIONALE:
     - JPEG forbidden: Lossy compression destroys thread-level precision
@@ -201,6 +203,7 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
     - Perfect tiling: Partial repeats cannot be woven
     - Dimensional limits: Jacquard loom physical constraints
     - Fast-fail: Prevent resource waste on invalid designs
+    - OOM protection: Pre-decode guard prevents memory exhaustion
     """
     
     @property
@@ -236,6 +239,10 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
         
         # STEP 1: Schema validation (already done by Pydantic)
         # If we reach here, schema is valid
+        
+        # STEP 1.5: Pre-decode resource check (OOM protection)
+        # Validates file size and estimates memory BEFORE PIL decode
+        self._validate_pre_decode_resources(input_data.image_path)
         
         # STEP 2: Decode image using lossless decoder
         image, image_info = self._decode_image(input_data.image_path)
@@ -289,7 +296,7 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
             bit_depth=image_info["bit_depth"],
             data={},
             metrics={
-                "validation_steps_passed": 9,
+                "validation_steps_passed": 10,
                 "pixel_count": image_info["width"] * image_info["height"],
                 "repeat_units_x": image_info["width"] // input_data.repeat_unit_px.width,
                 "repeat_units_y": image_info["height"] // input_data.repeat_unit_px.height,
@@ -304,6 +311,45 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
             data={"raw_hash": raw_hash},
             metrics=input_descriptor.metrics
         )
+    
+    def _validate_pre_decode_resources(self, image_path: str) -> None:
+        """
+        Pre-decode resource validation to prevent OOM.
+        
+        Checks file size BEFORE attempting PIL decode. This prevents
+        out-of-memory crashes from maliciously large or corrupted files.
+        
+        RATIONALE: PIL can allocate >2x decoded size during decode (especially TIFF).
+        Failing early protects the system from OOM before resource limits are checked.
+        
+        Raises:
+            ResourceProtectionError: If file size suggests unsafe memory usage
+        """
+        violations = []
+        
+        # Check file size (fast, no I/O beyond stat)
+        file_size = os.path.getsize(image_path)
+        if file_size > MAX_FILE_SIZE_BYTES:
+            violations.append(
+                f"File size {file_size / 1_048_576:.1f}MB exceeds maximum "
+                f"{MAX_FILE_SIZE_BYTES / 1_048_576:.0f}MB (pre-decode check)"
+            )
+        
+        if violations:
+            raise ResourceProtectionError(
+                message="Pre-decode resource limits exceeded",
+                stage_number=0,
+                details={
+                    "violations": violations,
+                    "file_size_bytes": file_size,
+                    "max_file_size": MAX_FILE_SIZE_BYTES,
+                    "rationale": (
+                        "File size check prevents OOM during decode. "
+                        "PIL can allocate >2x decoded size (especially TIFF). "
+                        "Rejecting before decode protects system resources."
+                    )
+                }
+            )
     
     def _decode_image(self, image_path: str) -> tuple[Image.Image, Dict[str, Any]]:
         """

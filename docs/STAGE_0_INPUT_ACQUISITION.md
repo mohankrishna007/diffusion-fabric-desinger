@@ -47,14 +47,15 @@ Stage 0 executes **9 validation steps** in strict order with **FAIL-FAST** seman
 
 ```
 1. Schema Validation      → Pydantic validates all required fields exist
-2. Image Decode          → PIL decodes image, extracts metadata  
-3. Format Allowlist      → Reject JPEG/WEBP (lossy formats)
-4. Metadata Consistency  → Declared vs actual (DPI, color mode)
-5. Dimensional Checks    → Width/height/megapixels within limits
-6. Repeat Integrity      → Perfect tiling (width % repeat_w == 0)
-7. Resource Protection   → File size, pixel count limits
-8. Source-of-Truth Seal  → Compute SHA-256 hash
-9. Emit Descriptor       → Return canonical InputDescriptor
+2. Pre-Decode Guard       → File size check (OOM protection)
+3. Image Decode           → PIL decodes image, extracts metadata  
+4. Format Allowlist       → Reject JPEG/WEBP (lossy formats)
+5. Metadata Consistency   → Declared vs actual (DPI, color mode)
+6. Dimensional Checks     → Width/height/megapixels within limits
+7. Repeat Integrity       → Perfect tiling (width % repeat_w == 0)
+8. Resource Protection    → Post-decode pixel count validation
+9. Source-of-Truth Seal   → Compute SHA-256 hash
+10. Emit Descriptor       → Return canonical InputDescriptor
 ```
 
 Any failure at any step **immediately halts** the pipeline with a detailed exception.
@@ -131,7 +132,7 @@ Stage0Output(
         bit_depth: int              # Bit depth per channel
     ),
     metrics: {
-        "validation_steps_passed": 9,
+        "validation_steps_passed": 10,
         "pixel_count": int,
         "repeat_units_x": int,
         "repeat_units_y": int
@@ -176,7 +177,33 @@ raise InputFormatError(
 
 ---
 
-### 2. Image Decode
+### 2. Pre-Decode Resource Guard
+
+**Performed by**: `_validate_pre_decode_resources()`
+
+**Purpose**: Prevent OOM (Out-Of-Memory) before attempting PIL decode.
+
+**Why this matters**:
+> "PIL can allocate more than 2× decoded image size during decoding, especially for TIFF. TIFF decompression buffers can spike memory usage to 4× or more. Checking file size BEFORE decode prevents system crashes from malicious or corrupted files."
+
+**Check**: File size must not exceed `MAX_FILE_SIZE_BYTES` (500 MB)
+
+**Fast-fail advantage**: Uses `os.path.getsize()` (stat only, no I/O). Rejects before allocating decode buffers.
+
+**Exception**: `ResourceProtectionError`
+
+```python
+details = {
+    "violations": ["File size 600.0MB exceeds maximum 500MB (pre-decode check)"],
+    "file_size_bytes": 629145600,
+    "max_file_size": 524288000,
+    "rationale": "File size check prevents OOM during decode. PIL can allocate >2x decoded size (especially TIFF). Rejecting before decode protects system resources."
+}
+```
+
+---
+
+### 3. Image Decode
 
 **Performed by**: PIL (Pillow)
 
@@ -193,7 +220,7 @@ raise InputFormatError(
 
 ---
 
-### 3. Format Allowlist
+### 4. Format Allowlist
 
 **Check**: File extension must be in `LOSSLESS_INPUT_FORMATS`
 
@@ -214,7 +241,7 @@ details = {
 
 ---
 
-### 4. Metadata Consistency
+### 5. Metadata Consistency
 
 **Check**: Declared metadata matches actual image properties
 
@@ -261,7 +288,7 @@ details = {
 
 ---
 
-### 5. Dimensional Constraints
+### 6. Dimensional Constraints
 
 **Check**: Image dimensions within Jacquard loom physical limits
 
@@ -286,7 +313,7 @@ details = {
 
 ---
 
-### 6. Repeat Integrity
+### 7. Repeat Integrity
 
 **Check**: Image dimensions are integer multiples of repeat unit
 
@@ -319,16 +346,15 @@ details = {
 
 ---
 
-### 7. Resource Protection
+### 8. Resource Protection (Post-Decode)
 
-**Check**: File size and pixel count within safe limits
+**Check**: Pixel count within safe limits after successful decode
 
 **Limits**:
-- `MAX_FILE_SIZE_BYTES = 500 MB`
 - `MAX_PIXEL_COUNT = 100,000,000` pixels
 
 **Purpose**:
-> "Prevents DoS and resource exhaustion. Stage 0 protects downstream stages from processing maliciously large or malformed files."
+> "Post-decode validation confirms actual image size. Complements pre-decode file size check. Protects downstream stages from processing images that passed file size but have extreme dimensions."
 
 **Exception**: `ResourceProtectionError`
 
@@ -343,7 +369,7 @@ details = {
 
 ---
 
-### 8. Source-of-Truth Sealing
+### 9. Source-of-Truth Sealing
 
 **Action**: Compute SHA-256 hash of raw image bytes
 
@@ -365,7 +391,7 @@ def _compute_image_hash(self, image_path: str) -> str:
 
 ---
 
-### 9. Emit InputDescriptor
+### 10. Emit InputDescriptor
 
 **Action**: Create canonical `InputDescriptor` with all validated properties
 
@@ -632,9 +658,22 @@ If we auto-corrected issues:
 
 ### Memory Usage
 
-- Peak memory ≈ 2× decoded image size (PIL loads full image)
-- Example: 10000×10000 RGB = 300MB decoded → ~600MB peak
-- Hash computation uses 64KB chunks (memory efficient)
+**WARNING**: Peak memory can significantly exceed 2× decoded size.
+
+- **Theoretical minimum**: 1× decoded image size (width × height × channels × bytes_per_channel)
+- **Typical PIL behavior**: 2-3× decoded size during operations
+- **TIFF decoding spikes**: Can temporarily exceed 4× due to decompression buffers
+- **Hash computation**: Memory-efficient (64KB chunks)
+
+**Example** (10000×10000 RGB @ 8-bit):
+- Decoded size: 300MB (10000 × 10000 × 3 bytes)
+- Typical peak: 600-900MB
+- TIFF worst-case: 1200MB+
+
+**Protection**:
+- Pre-decode file size check (MAX_FILE_SIZE_BYTES = 500MB)
+- Post-decode pixel count check (MAX_PIXEL_COUNT = 100M)
+- Early rejection prevents OOM before full decode
 
 ---
 

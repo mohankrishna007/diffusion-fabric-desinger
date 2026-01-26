@@ -42,6 +42,7 @@ MAX_IMAGE_HEIGHT: Final[int] = 10000  # Loom maximum height
 MAX_MEGAPIXELS: Final[int] = 100  # 10000 x 10000 = loom limit
 MAX_FILE_SIZE_BYTES: Final[int] = 500 * 1024 * 1024  # 500 MB (resource protection)
 MAX_PIXEL_COUNT: Final[int] = MAX_MEGAPIXELS * 1_000_000
+MAX_DECODE_MEMORY_BYTES: Final[int] = 1024 * 1024 * 1024  # 1 GB max for image decode (OOM protection)
 MIN_DPI: Final[int] = 72  # Below this, thread precision is lost
 MAX_DPI: Final[int] = 1200  # Above this, loom cannot resolve
 

@@ -560,6 +560,38 @@ class TestRepeatIntegrity:
 class TestResourceProtection:
     """Test resource protection limits."""
     
+    def test_pre_decode_file_size_check(
+        self, stage: Stage0InputAcquisition, temp_dir: Path
+    ):
+        """
+        Test pre-decode file size check prevents OOM.
+        
+        RATIONALE: PIL can allocate >2x during decode. Early rejection
+        protects system before attempting decode.
+        """
+        # Create a file that's too large (mock by monkey-patching os.path.getsize)
+        img = Image.new("RGB", (1000, 800), color="red")
+        img_path = temp_dir / "large.png"
+        img.save(img_path, "PNG", dpi=(300, 300))
+        
+        input_data = _make_input(img_path, dpi=300, repeat_width=200, repeat_height=200, color_mode="RGB")
+        
+        # Monkey patch to simulate large file
+        import os
+        original_getsize = os.path.getsize
+        try:
+            os.path.getsize = lambda p: 600 * 1024 * 1024 if p == str(img_path) else original_getsize(p)
+            
+            with pytest.raises(ResourceProtectionError) as exc_info:
+                stage.run(input_data)
+            
+            error = exc_info.value
+            assert "Pre-decode resource limits exceeded" in error.message
+            assert "pre-decode check" in error.details["violations"][0]
+            assert "PIL can allocate >2x" in error.details["rationale"]
+        finally:
+            os.path.getsize = original_getsize
+    
     def test_file_size_exceeds_maximum(
         self, stage: Stage0InputAcquisition, temp_dir: Path
     ):
