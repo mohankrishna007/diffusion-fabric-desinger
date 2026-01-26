@@ -77,3 +77,73 @@ class StageTimeoutError(StageError):
             stage_number=stage_number,
             details={"timeout_seconds": timeout_seconds}
         )
+
+
+# ============================================================================
+# STAGE 0 - INPUT ACQUISITION EXCEPTIONS
+# Manufacturing-first validation errors with zero tolerance
+# ============================================================================
+
+class InputFormatError(ValidationError):
+    """
+    Raised when input file format is not on the lossless allowlist.
+    
+    RATIONALE: Lossy formats (JPEG, WEBP) introduce compression artifacts
+    that destroy thread-level precision needed for CAM export. Only lossless
+    formats (PNG, TIFF, BMP) preserve manufacturing intent.
+    """
+    pass
+
+
+class MetadataConsistencyError(ValidationError):
+    """
+    Raised when declared metadata conflicts with actual image properties.
+    
+    RATIONALE: Metadata inconsistency indicates data corruption or manual
+    error. CAM systems require perfect metadata trust - any discrepancy
+    halts the pipeline to prevent dimensional errors in physical fabric.
+    """
+    pass
+
+
+class DimensionalConstraintError(ValidationError):
+    """
+    Raised when image dimensions exceed manufacturing equipment limits.
+    
+    RATIONALE: Jacquard looms have fixed maximum dimensions. Oversized
+    designs cannot be manufactured and must be rejected at input to
+    prevent downstream resource waste.
+    """
+    pass
+
+
+class RepeatIntegrityError(ValidationError):
+    """
+    Raised when image dimensions are not integer multiples of repeat unit.
+    
+    RATIONALE: Non-integer tiling creates partial repeats at boundaries,
+    which cannot be woven. Repeat unit must tile perfectly (width % repeat_w == 0)
+    or the design is physically impossible to manufacture.
+    """
+    pass
+
+
+class ResourceProtectionError(ValidationError):
+    """
+    Raised when input file exceeds memory or processing resource limits.
+    
+    RATIONALE: Prevents DoS and resource exhaustion. Stage 0 protects
+    downstream stages from processing maliciously large or malformed files.
+    """
+    pass
+
+
+class InputSchemaError(ValidationError):
+    """
+    Raised when input design package is missing required metadata fields.
+    
+    RATIONALE: Stage 0 requires explicit metadata (dpi, repeat_unit_px, color_mode).
+    No inference allowed - missing data means incomplete specification and
+    must be rejected to maintain source-of-truth integrity.
+    """
+    pass

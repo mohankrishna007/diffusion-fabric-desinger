@@ -18,13 +18,13 @@ manufacturing:
 image:
   default_dpi: 300
   color_space: "RGB"
+  # LOSSLESS FORMATS ONLY - JPEG forbidden per Stage 0 mandate
+  # Lossy compression destroys thread-level precision needed for CAM export
   supported_formats:
     - ".bmp"
     - ".png"
     - ".tiff"
     - ".tif"
-    - ".jpg"
-    - ".jpeg"
   output_format: ".bmp"
 
 # Stage-specific configurations
@@ -32,7 +32,8 @@ stages:
   stage_0:
     name: "Input Acquisition"
     timeout_seconds: 60
-    max_file_size_mb: 500
+    # Note: Validation limits (DPI, dimensions, file size) are defined in
+    # src/weaver/shared/constants.py as immutable manufacturing constraints
     
   stage_1:
     name: "Canonical Normalization"

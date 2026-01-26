@@ -15,6 +15,7 @@ from weaver.shared.exceptions import (
     PipelineExecutionError, StageError, ValidationError,
     ContractViolationError
 )
+from weaver.shared.constants import DEFAULT_DPI
 
 
 logger = logging.getLogger(__name__)
@@ -174,8 +175,34 @@ class PipelineEngine:
         Returns:
             Stage input data
         """
-        # For now, create a basic StageInput
-        # Stage-specific implementations will extend this
+        # Stage 0: Input Acquisition - needs specific Stage0Input schema
+        if stage_number == 0:
+            from weaver.stages.stage_0_input_acquisition.processor import Stage0Input, RepeatUnit
+            
+            # Extract config values with defaults
+            config = context.config or {}
+            dpi = config.get("dpi", DEFAULT_DPI)
+            color_mode = config.get("color_mode", "RGB")
+            
+            # Extract repeat unit from config
+            repeat_config = config.get("repeat_unit", {"width": 200, "height": 200})
+            repeat_unit = RepeatUnit(
+                width=repeat_config.get("width", 200),
+                height=repeat_config.get("height", 200)
+            )
+            
+            return Stage0Input(
+                pipeline_id=context.pipeline_id,
+                stage_number=stage_number,
+                metadata={},
+                image_path=context.source_file,
+                dpi=dpi,
+                repeat_unit_px=repeat_unit,
+                color_mode=color_mode
+            )
+        
+        # For other stages, create basic StageInput
+        # Stage-specific implementations will extend this as needed
         return StageInput(
             pipeline_id=context.pipeline_id,
             stage_number=stage_number,
