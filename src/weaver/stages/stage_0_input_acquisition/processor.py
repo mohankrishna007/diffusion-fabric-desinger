@@ -588,17 +588,31 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
         which cannot be woven. Repeat must tile perfectly.
         
         Raises:
-            RepeatIntegrityError: If non-integer tiling detected
+            RepeatIntegrityError: If non-integer tiling detected or repeat exceeds image
         """
         violations = []
         
-        if width % repeat_unit.width != 0:
+        # Check repeat unit doesn't exceed image dimensions
+        if repeat_unit.width > width:
+            violations.append(
+                f"Repeat width {repeat_unit.width}px exceeds image width {width}px - "
+                f"repeat unit cannot be larger than image"
+            )
+        
+        if repeat_unit.height > height:
+            violations.append(
+                f"Repeat height {repeat_unit.height}px exceeds image height {height}px - "
+                f"repeat unit cannot be larger than image"
+            )
+        
+        # Check perfect tiling (only if repeat doesn't exceed image)
+        if repeat_unit.width <= width and width % repeat_unit.width != 0:
             violations.append(
                 f"Width {width}px is not a multiple of repeat width "
                 f"{repeat_unit.width}px (remainder: {width % repeat_unit.width}px)"
             )
         
-        if height % repeat_unit.height != 0:
+        if repeat_unit.height <= height and height % repeat_unit.height != 0:
             violations.append(
                 f"Height {height}px is not a multiple of repeat height "
                 f"{repeat_unit.height}px (remainder: {height % repeat_unit.height}px)"
@@ -606,7 +620,7 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
         
         if violations:
             raise RepeatIntegrityError(
-                message="Repeat integrity validation failed - non-integer tiling",
+                message="Repeat integrity validation failed",
                 stage_number=0,
                 details={
                     "violations": violations,

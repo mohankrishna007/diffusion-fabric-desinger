@@ -589,7 +589,56 @@ class TestRepeatIntegrity:
             stage.run(input_data)
         
         error = exc_info.value
-        assert len(error.details["violations"]) == 2  # Both width and height
+        assert len(error.details["violations"]) == 2
+    
+    def test_repeat_width_exceeds_image_width(
+        self, stage: Stage0InputAcquisition, temp_dir: Path
+    ):
+        """
+        Test FAIL when repeat width exceeds image width.
+        
+        RATIONALE: Clear error message when repeat is larger than image.
+        Edge case that modulo would catch but with confusing message.
+        """
+        # Image 800x600, repeat 1000x200 (width too large)
+        img = Image.new("RGB", (800, 600), color="blue")
+        img_path = temp_dir / "small_image.png"
+        img.save(img_path, "PNG", dpi=(300, 300))
+        
+        input_data = _make_input(img_path, dpi=300, repeat_width=1000, repeat_height=200, color_mode="RGB")
+        
+        with pytest.raises(RepeatIntegrityError) as exc_info:
+            stage.run(input_data)
+        
+        error = exc_info.value
+        assert "exceeds image width" in error.details["violations"][0]
+        assert "1000px exceeds" in error.details["violations"][0]
+        assert error.details["repeat_width"] == 1000
+        assert error.details["image_width"] == 800
+    
+    def test_repeat_height_exceeds_image_height(
+        self, stage: Stage0InputAcquisition, temp_dir: Path
+    ):
+        """
+        Test FAIL when repeat height exceeds image height.
+        
+        RATIONALE: Clear error message when repeat is larger than image.
+        """
+        # Image 800x600, repeat 200x1000 (height too large)
+        img = Image.new("RGB", (800, 600), color="green")
+        img_path = temp_dir / "short_image.png"
+        img.save(img_path, "PNG", dpi=(300, 300))
+        
+        input_data = _make_input(img_path, dpi=300, repeat_width=200, repeat_height=1000, color_mode="RGB")
+        
+        with pytest.raises(RepeatIntegrityError) as exc_info:
+            stage.run(input_data)
+        
+        error = exc_info.value
+        assert "exceeds image height" in error.details["violations"][0]
+        assert "1000px exceeds" in error.details["violations"][0]
+        assert error.details["repeat_height"] == 1000
+        assert error.details["image_height"] == 600
 
 
 # ============================================================================
