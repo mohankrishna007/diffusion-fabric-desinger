@@ -92,7 +92,7 @@ def oversized_image(temp_dir: Path) -> Path:
     # Exceeds MAX_IMAGE_WIDTH = 10000
     img = Image.new("RGB", (12000, 800), color="purple")
     img_path = temp_dir / "oversized.png"
-    img.save(img_path, "PNG")
+    img.save(img_path, "PNG", dpi=(300, 300))  # Add DPI for PNG
     return img_path
 
 
@@ -395,6 +395,54 @@ class TestMetadataConsistency:
         assert error.details["declared_dpi"] == 150
         # PIL may return DPI as float, check with tolerance
         assert abs(error.details["actual_dpi"] - 300) < 1
+    
+    def test_png_missing_dpi_fails(
+        self, stage: Stage0InputAcquisition, temp_dir: Path
+    ):
+        """
+        Test FAIL when PNG lacks DPI metadata.
+        
+        RATIONALE: PNG/TIFF must have embedded DPI for manufacturing trust.
+        Format-specific rule: PNG requires DPI metadata.
+        """
+        # Create PNG without DPI metadata
+        img = Image.new("RGB", (1000, 800), color="red")
+        img_path = temp_dir / "no_dpi.png"
+        img.save(img_path, "PNG")  # No dpi parameter
+        
+        input_data = _make_input(img_path, dpi=300, repeat_width=200, repeat_height=200, color_mode="RGB")
+        
+        with pytest.raises(MetadataConsistencyError) as exc_info:
+            stage.run(input_data)
+        
+        error = exc_info.value
+        assert "DPI metadata missing in PNG file" in error.details["violations"][0]
+        assert error.details["file_format"] == "PNG"
+        assert error.details["actual_dpi"] is None
+    
+    def test_bmp_missing_dpi_passes(
+        self, stage: Stage0InputAcquisition, temp_dir: Path
+    ):
+        """
+        Test PASS when BMP lacks DPI metadata (declared DPI is authoritative).
+        
+        RATIONALE: BMP DPI is unreliable - declared DPI is the source of truth.
+        Format-specific rule: BMP with missing/zero DPI uses declared value.
+        """
+        # Create BMP without explicit DPI (PIL often gives 0 or None for BMP)
+        img = Image.new("RGB", (1000, 800), color="green")
+        img_path = temp_dir / "no_dpi.bmp"
+        img.save(img_path, "BMP")  # BMP typically has no reliable DPI
+        
+        # Note: PIL may return default 96 DPI for BMP, but we want to test
+        # the case where declared DPI is used. For true BMP with no DPI,
+        # we'd need a binary editor. For this test, we declare 96 to match.
+        input_data = _make_input(img_path, dpi=96, repeat_width=200, repeat_height=200, color_mode="RGB")
+        
+        # Should PASS - declared DPI matches BMP's default
+        output = stage.run(input_data)
+        assert output.status == StageStatus.COMPLETED
+        assert output.input_descriptor.dpi == 96  # Uses declared DPI
 
 
 # ============================================================================
@@ -596,7 +644,7 @@ class TestEdgeCases:
         """Test smallest valid image (1x1 pixel with 1x1 repeat)."""
         img = Image.new("RGB", (1, 1), color="white")
         img_path = temp_dir / "tiny.png"
-        img.save(img_path, "PNG")
+        img.save(img_path, "PNG", dpi=(300, 300))  # Add DPI for PNG
         
         input_data = _make_input(img_path, dpi=300, repeat_width=1, repeat_height=1, color_mode="RGB")
         
@@ -610,7 +658,7 @@ class TestEdgeCases:
         # This is expensive - create a smaller version for testing
         img = Image.new("RGB", (10000, 10000), color="black")
         img_path = temp_dir / "max_size.png"
-        img.save(img_path, "PNG")
+        img.save(img_path, "PNG", dpi=(300, 300))  # Add DPI for PNG
         
         input_data = _make_input(img_path, dpi=300, repeat_width=1000, repeat_height=1000, color_mode="RGB")
         

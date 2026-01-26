@@ -220,22 +220,42 @@ details = {
 
 **Color Mode**: Declared must exactly match image mode (RGB != RGBA)
 
-**DPI**: If image has DPI metadata:
-- Compare declared vs actual DPI
-- Allow 1% tolerance for floating-point rounding
-- `abs(declared_dpi - actual_dpi) <= max(1, declared_dpi * 0.01)`
+**DPI (Format-Specific Rules)**:
 
-**Why this matters**:
-> "Metadata inconsistency indicates data corruption or manual error. CAM systems require perfect metadata trust—any discrepancy halts the pipeline to prevent dimensional errors in physical fabric."
+**PNG & TIFF**:
+- DPI metadata **MUST** be present in image file
+- If missing → **FAIL** (incomplete metadata)
+- If present → must match declared DPI within 1% tolerance
+- Formula: `abs(declared_dpi - actual_dpi) <= max(1, declared_dpi * 0.01)`
+
+**BMP**:
+- Declared DPI is **authoritative** (BMP DPI metadata is unreliable)
+- If BMP header DPI exists AND non-zero → must match declared DPI
+- If BMP header DPI missing or zero → trust declared DPI (no validation)
+- Rationale: BMP format often stores zero or invalid DPI values
+
+**Why format-specific rules matter**:
+> "PNG and TIFF store reliable DPI metadata that CAM systems depend on for physical dimensions. BMP DPI fields are often zero, corrupted, or absent—making declared DPI the only trustworthy source. Treating all formats identically causes false failures (BMP) or false trust (missing PNG DPI)."
 
 **Exception**: `MetadataConsistencyError`
 
 ```python
+# PNG missing DPI example
+details = {
+    "violations": ["DPI metadata missing in PNG file. PNG/TIFF must have embedded DPI for manufacturing trust."],
+    "file_format": "PNG",
+    "declared_dpi": 300,
+    "actual_dpi": None,
+    "rationale": "Metadata inconsistency prevents dimensional errors in physical fabric manufacturing. Format-specific rules: PNG DPI trust enforced."
+}
+
+# Color mode mismatch example
 details = {
     "violations": ["Color mode mismatch: declared 'RGBA' but image is 'RGB'"],
+    "file_format": "PNG",
     "declared_color_mode": "RGBA",
     "actual_color_mode": "RGB",
-    "rationale": "Metadata inconsistency prevents dimensional errors in physical fabric manufacturing"
+    "rationale": "Metadata inconsistency prevents dimensional errors in physical fabric manufacturing."
 }
 ```
 

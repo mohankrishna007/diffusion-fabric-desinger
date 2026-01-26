@@ -394,8 +394,12 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
         """
         Validate declared metadata matches actual image properties.
         
-        RATIONALE: Metadata inconsistency indicates data corruption or manual
-        error. CAM systems require perfect metadata trust.
+        FORMAT-SPECIFIC DPI TRUST RULES:
+        - PNG, TIFF: DPI must be present in image AND match declared (fail if missing)
+        - BMP: Declared DPI is authoritative (only validate if BMP has non-zero DPI)
+        
+        RATIONALE: BMP DPI metadata is unreliable (often zero or missing).
+        PNG/TIFF DPI is trustworthy and must match for dimensional accuracy.
         
         Raises:
             MetadataConsistencyError: If declared metadata conflicts with image
@@ -409,18 +413,40 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
                 f"but image is '{image_info['mode']}'"
             )
         
-        # Check DPI consistency if image has DPI metadata
-        if image_info["dpi"] is not None:
-            # Allow 1% tolerance for floating point rounding
-            tolerance = max(1, int(input_data.dpi * 0.01))
-            # Compare as floats to handle rounding
-            actual_dpi = float(image_info["dpi"])
-            declared_dpi = float(input_data.dpi)
-            if abs(declared_dpi - actual_dpi) > tolerance:
+        # Check DPI consistency with format-specific rules
+        file_format = image_info["format"]
+        image_dpi = image_info["dpi"]
+        
+        if file_format in ("PNG", "TIFF"):
+            # PNG/TIFF: DPI must be present and match
+            if image_dpi is None:
                 violations.append(
-                    f"DPI mismatch: declared {input_data.dpi} "
-                    f"but image metadata is {image_info['dpi']}"
+                    f"DPI metadata missing in {file_format} file. "
+                    f"PNG/TIFF must have embedded DPI for manufacturing trust."
                 )
+            else:
+                # Allow 1% tolerance for floating point rounding
+                tolerance = max(1, int(input_data.dpi * 0.01))
+                actual_dpi = float(image_dpi)
+                declared_dpi = float(input_data.dpi)
+                if abs(declared_dpi - actual_dpi) > tolerance:
+                    violations.append(
+                        f"DPI mismatch: declared {input_data.dpi} "
+                        f"but {file_format} metadata is {image_dpi}"
+                    )
+        
+        elif file_format == "BMP":
+            # BMP: Declared DPI is authoritative (only validate if present AND non-zero)
+            if image_dpi is not None and image_dpi > 0:
+                tolerance = max(1, int(input_data.dpi * 0.01))
+                actual_dpi = float(image_dpi)
+                declared_dpi = float(input_data.dpi)
+                if abs(declared_dpi - actual_dpi) > tolerance:
+                    violations.append(
+                        f"DPI mismatch: declared {input_data.dpi} "
+                        f"but BMP header is {image_dpi}"
+                    )
+            # If BMP DPI is None or zero, trust declared DPI (no violation)
         
         if violations:
             raise MetadataConsistencyError(
@@ -428,13 +454,15 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
                 stage_number=0,
                 details={
                     "violations": violations,
+                    "file_format": file_format,
                     "declared_dpi": input_data.dpi,
                     "declared_color_mode": input_data.color_mode,
                     "actual_dpi": image_info["dpi"],
                     "actual_color_mode": image_info["mode"],
                     "rationale": (
                         "Metadata inconsistency prevents dimensional errors "
-                        "in physical fabric manufacturing"
+                        "in physical fabric manufacturing. "
+                        f"Format-specific rules: {file_format} DPI trust enforced."
                     )
                 }
             )
