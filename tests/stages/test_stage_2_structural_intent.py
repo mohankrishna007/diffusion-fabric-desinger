@@ -153,8 +153,7 @@ class TestHappyPath:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)
@@ -216,8 +215,7 @@ class TestHappyPath:
             height_px=600,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)
@@ -256,8 +254,7 @@ class TestEdgeDetection:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)
@@ -319,8 +316,7 @@ class TestSkeletonAndTopology:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)
@@ -355,8 +351,7 @@ class TestSkeletonAndTopology:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)
@@ -390,8 +385,7 @@ class TestRegionExtraction:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)
@@ -424,8 +418,7 @@ class TestRegionExtraction:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)
@@ -461,8 +454,7 @@ class TestBoundaryMask:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)
@@ -498,8 +490,7 @@ class TestBoundaryMask:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)
@@ -537,8 +528,7 @@ class TestBoundaryMask:
             height_px=400,
             dpi=300,
             repeat_width_px=300,
-            repeat_height_px=300,
-            workspace_dir=str(workspace)
+            repeat_height_px=300
         )
         
         with pytest.raises(BoundaryInconsistencyError) as exc_info:
@@ -570,8 +560,7 @@ class TestStructuralMetadata:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)
@@ -616,8 +605,7 @@ class TestStructuralMetadata:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)
@@ -653,8 +641,7 @@ class TestFailureScenarios:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         with pytest.raises(ValidationError) as exc_info:
@@ -686,8 +673,7 @@ class TestFailureScenarios:
             height_px=200,
             dpi=300,
             repeat_width_px=100,
-            repeat_height_px=100,
-            workspace_dir=str(workspace)
+            repeat_height_px=100
         )
         
         with pytest.raises(TopologyViolationError) as exc_info:
@@ -719,8 +705,7 @@ class TestOutputContract:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)
@@ -762,8 +747,7 @@ class TestOutputContract:
             height_px=400,
             dpi=300,
             repeat_width_px=200,
-            repeat_height_px=200,
-            workspace_dir=str(workspace)
+            repeat_height_px=200
         )
         
         output = stage.execute(input_data)

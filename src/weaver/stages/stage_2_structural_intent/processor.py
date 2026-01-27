@@ -32,6 +32,7 @@ from skimage.measure import regionprops
 
 from weaver.stages.base import BaseStage, StageMetadata
 from weaver.shared.schemas import StageInput, StageOutput, StageStatus
+from weaver.shared.constants import WORKSPACE_BASE_DIR
 from weaver.shared.exceptions import (
     TopologyViolationError,
     RegionLeakageError,
@@ -60,7 +61,6 @@ class Stage2Input(StageInput):
     dpi: int = Field(..., ge=72, le=1200, description="Image DPI")
     repeat_width_px: int = Field(..., gt=0, description="Repeat unit width in pixels")
     repeat_height_px: int = Field(..., gt=0, description="Repeat unit height in pixels")
-    workspace_dir: str = Field(..., description="Workspace directory for output artifacts")
 
 
 class StructuralMetadata(BaseModel):
@@ -183,8 +183,9 @@ class Stage2StructuralIntent(BaseStage[Stage2Input, Stage2Output]):
         """
         logger.info(f"Starting Stage 2 execution: {input_data.pipeline_id}")
         
-        # Create output directory structure
-        output_dir = Path(input_data.workspace_dir) / "structural_intent"
+        # Create output directory structure using global workspace constant
+        workspace_base = Path(WORKSPACE_BASE_DIR)
+        output_dir = workspace_base / input_data.pipeline_id / "structural_intent"
         ensure_directory(str(output_dir))
         
         region_masks_dir = output_dir / "region_masks"
