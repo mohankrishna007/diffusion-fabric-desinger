@@ -147,3 +147,44 @@ class InputSchemaError(ValidationError):
     must be rejected to maintain source-of-truth integrity.
     """
     pass
+
+
+# ============================================================================
+# STAGE 2 - STRUCTURAL INTENT DEFINITION EXCEPTIONS
+# Geometric invariant extraction with zero tolerance for ambiguity
+# ============================================================================
+
+class TopologyViolationError(ValidationError):
+    """
+    Raised when skeleton topology is broken or disconnected.
+    
+    RATIONALE: Broken topology indicates edge detection failure or
+    structural inconsistency. Downstream diffusion and CAM stages
+    require topologically sound skeletons - fragments or disconnected
+    nodes cannot be reliably processed.
+    """
+    pass
+
+
+class RegionLeakageError(ValidationError):
+    """
+    Raised when a detected region is not fully enclosed or overlaps with another.
+    
+    RATIONALE: Leaking regions indicate unclosed boundaries that violate
+    manufacturing intent. CAM systems require closed, non-overlapping
+    regions for proper thread path generation. Ambiguous boundaries
+    must fail rather than be inferred.
+    """
+    pass
+
+
+class BoundaryInconsistencyError(ValidationError):
+    """
+    Raised when repeat boundary mask does not align with declared repeat dimensions.
+    
+    RATIONALE: Repeat boundaries are immutable constraints for tiling.
+    Any pixel-level misalignment between declared dimensions and generated
+    mask indicates incorrect metadata or edge detection failure, which
+    would cause repeat violations in downstream stages.
+    """
+    pass

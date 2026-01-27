@@ -69,6 +69,7 @@ class PipelineContext(BaseModel):
     pipeline_id: str = Field(..., description="Unique pipeline execution ID")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="Pipeline creation timestamp")
     source_file: str = Field(..., description="Original input file path")
+    workspace_dir: Optional[str] = Field(default=None, description="Workspace directory for stage artifacts")
     config: Dict[str, Any] = Field(default_factory=dict, description="Pipeline configuration")
     stage_outputs: Dict[int, StageOutput] = Field(default_factory=dict, description="Outputs from completed stages")
 

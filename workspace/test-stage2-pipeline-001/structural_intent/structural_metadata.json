@@ -1,0 +1,21 @@
+{
+  "schema_version": "stage2.v1",
+  "width_px": 400,
+  "height_px": 400,
+  "dpi": 300,
+  "repeat_width_px": 200,
+  "repeat_height_px": 200,
+  "edge_count": 1600,
+  "skeleton_node_count": 1596,
+  "skeleton_edge_count": 1596,
+  "region_count": 0,
+  "topology_validated": true,
+  "repeat_boundary_validated": true,
+  "guarantees": [
+    "All motif boundaries captured in edge map",
+    "Skeleton topology validated (no disconnected fragments)",
+    "All regions fully enclosed and non-overlapping",
+    "Repeat boundaries pixel-perfect aligned",
+    "No auto-correction or inference applied"
+  ]
+}

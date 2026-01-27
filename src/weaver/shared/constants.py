@@ -62,6 +62,9 @@ API_VERSION: Final[str] = "v1"
 DEFAULT_PAGE_SIZE: Final[int] = 50
 MAX_PAGE_SIZE: Final[int] = 100
 
+# Workspace
+WORKSPACE_BASE_DIR: Final[str] = "storage"
+
 # Logging
 LOG_FORMAT: Final[str] = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 DEFAULT_LOG_LEVEL: Final[str] = "INFO"
