@@ -31,6 +31,7 @@ dependencies = [
     "opencv-python>=4.9.0.80",
     "numpy>=1.26.3",
     "scikit-image>=0.22.0",
+    "networkx>=3.2.1",
     "PyYAML>=6.0.1",
     "python-dotenv>=1.0.0",
     "python-multipart>=0.0.6",
