@@ -201,6 +201,71 @@ class PipelineEngine:
                 color_mode=color_mode
             )
         
+        # Stage 1: Canonical Normalization - uses Stage 0 output
+        if stage_number == 1:
+            from weaver.stages.stage_1_canonical_normalization.processor import Stage1Input
+            from weaver.stages.stage_0_input_acquisition.processor import Stage0Output
+            
+            # Get Stage 0 output
+            stage0_output = context.stage_outputs.get(0)
+            if not stage0_output:
+                raise ValidationError(
+                    "Stage 1 requires Stage 0 output",
+                    stage_number=1,
+                    details={"missing": "stage_0_output"}
+                )
+            
+            # Cast to Stage0Output to access input_descriptor
+            if not isinstance(stage0_output, Stage0Output) or not stage0_output.input_descriptor:
+                raise ValidationError(
+                    "Stage 0 output missing input_descriptor",
+                    stage_number=1,
+                    details={"missing": "input_descriptor"}
+                )
+            
+            descriptor = stage0_output.input_descriptor
+            
+            return Stage1Input(
+                pipeline_id=context.pipeline_id,
+                stage_number=stage_number,
+                metadata={},
+            )
+        
+        # Stage 2: Structural Intent Definition - uses Stage 1 output
+        if stage_number == 2:
+            from weaver.stages.stage_2_structural_intent.processor import Stage2Input
+            from weaver.stages.stage_1_canonical_normalization.processor import Stage1Output
+            
+            # Get Stage 1 output
+            stage1_output = context.stage_outputs.get(1)
+            if not stage1_output:
+                raise ValidationError(
+                    "Stage 2 requires Stage 1 output",
+                    stage_number=2,
+                    details={"missing": "stage_1_output"}
+                )
+            
+            # Cast to Stage1Output
+            if not isinstance(stage1_output, Stage1Output):
+                raise ValidationError(
+                    "Stage 1 ouput cast failed",
+                    stage_number=2,
+                    details={"failed_cast": "Stage1Output"}
+                )
+            
+            # Map Stage 1 output to Stage 2 input
+            # TODO: Replace with actual Stage1Output fields once Stage 1 is implemented
+            return Stage2Input(
+                pipeline_id=context.pipeline_id,
+                stage_number=stage_number,
+                canonical_image_path=context.source_file,  # Mock: use original source file
+                width_px=800,  # Mock: placeholder value
+                height_px=600,  # Mock: placeholder value
+                dpi=300,  # Mock: placeholder value
+                repeat_width_px=200,  # Mock: placeholder value
+                repeat_height_px=200   # Mock: placeholder value
+            )
+        
         # For other stages, create basic StageInput
         # Stage-specific implementations will extend this as needed
         return StageInput(
