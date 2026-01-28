@@ -1,31 +1,47 @@
 """
-Stage 1: Canonical Normalization
+Stage 1: Canonical Normalization - Refactored Modular Architecture
 
 PURPOSE:
 Converts a VALIDATED but REPRESENTATION-AMBIGUOUS image into a SINGLE,
 DETERMINISTIC internal representation called the CANONICAL RASTER.
 
+ARCHITECTURE:
+This processor orchestrates a linear pipeline of specialized sub-modules:
+1. OrientationNormalizer - Apply EXIF rotation, clear flags
+2. ColorSpaceNormalizer - Convert to RGB, resolve alpha, strip ICC
+3. DPICanonicalizer - Rescale pixels to canonical DPI
+4. GridNormalizer - Validate repeat grid integrity
+5. RasterEmitter - Convert to NumPy array, apply hybrid storage
+
+Each module is:
+- Single-responsibility
+- Side-effect free (except file I/O)
+- Unit testable
+- Composable
+
 GUARANTEES:
 - Color mode: RGB only (no RGBA, L, P, or exotic modes)
 - Bit depth: 8-bit per channel
 - Orientation: normalized (EXIF rotation applied)
-- Pixel grid: unchanged geometry (no rescaling)
+- DPI: canonical DPI enforced (pixels rescaled if needed)
+- ICC profiles: stripped (deterministic color interpretation)
 - Repeat grid: perfectly aligned (width % repeat_w == 0)
-- Encoding: in-memory NumPy array stored as .npy file
+- Encoding: hybrid storage (in-memory or .npy file based on size)
 
 FORBIDDEN:
 - No AI or diffusion
-- No geometry smoothing
+- No geometry smoothing beyond resampling
 - No motif creation/deletion
-- No cropping or resizing
+- No cropping or padding
 - No metadata inference
 """
 
 import time
+import yaml
 from pathlib import Path
 from typing import Dict, Any, List
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image
 
 from weaver.stages.base import BaseStage, StageMetadata
 from weaver.shared.schemas import (
@@ -33,9 +49,20 @@ from weaver.shared.schemas import (
     StageOutput,
     StageStatus,
     CanonicalRaster,
+    AlphaPolicy,
 )
 from weaver.shared.exceptions import CanonicalizationError
+from weaver.shared.logger import get_logger
 from pydantic import Field, ConfigDict
+
+# Import sub-modules
+from .orientation_normalizer import normalize_orientation, validate_orientation_normalized
+from .colorspace_normalizer import normalize_color_space, validate_color_space_normalized
+from .dpi_canonicalizer import canonicalize_dpi, validate_dpi_canonical
+from .grid_normalizer import validate_repeat_grid, calculate_tile_counts
+from .raster_emitter import emit_canonical_raster, validate_canonical_raster
+
+logger = get_logger(__name__)
 
 
 class Stage1Input(StageInput):
@@ -50,11 +77,11 @@ class Stage1Input(StageInput):
     
     # From InputDescriptor (Stage 0 output)
     image_path: str = Field(..., description="Path to immutable raw image")
-    width_px: int = Field(..., description="Image width in pixels")
-    height_px: int = Field(..., description="Image height in pixels")
+    width_px: int = Field(..., description="Image width in pixels (at input DPI)")
+    height_px: int = Field(..., description="Image height in pixels (at input DPI)")
     dpi: int = Field(..., description="Validated DPI from Stage 0")
     repeat_unit_px: Dict[str, int] = Field(
-        ..., description="Repeat unit {width, height} in pixels"
+        ..., description="Repeat unit {width, height} in pixels (at input DPI)"
     )
     color_mode: str = Field(..., description="Original color mode from Stage 0")
     bit_depth: int = Field(..., description="Original bit depth from Stage 0")
@@ -86,27 +113,79 @@ class Stage1CanonicalNormalization(BaseStage[Stage1Input, Stage1Output]):
     """
     Stage 1: Canonical Normalization
     
-    Converts validated input into deterministic canonical form.
-    Removes ALL representational ambiguity for downstream stages.
+    Orchestrates linear pipeline of normalization sub-modules.
     
-    PROCESSING STEPS (IN ORDER):
+    PROCESSING PIPELINE:
     1. Load image from InputDescriptor.image_path
-    2. Normalize orientation using EXIF transpose
-    3. Normalize color space (RGB/RGBA/L/P → RGB)
-    4. Normalize bit depth (enforce 8-bit per channel)
-    5. Assert repeat grid integrity (fail if violated)
-    6. Convert to NumPy array (H, W, 3) uint8
-    7. Save to .npy file in storage/{pipeline_id}/
-    8. Emit CanonicalRaster object
+    2. OrientationNormalizer: Apply EXIF rotation, clear flags
+    3. ColorSpaceNormalizer: Convert to RGB, resolve alpha, strip ICC
+    4. DPICanonicalizer: Rescale pixels to canonical DPI
+    5. GridNormalizer: Validate repeat grid integrity
+    6. RasterEmitter: Convert to NumPy, apply hybrid storage
+    7. Validate: Check all post-execution invariants
     """
+    
+    def __init__(self):
+        super().__init__()
+        self._load_config()
+    
+    def _load_config(self) -> None:
+        """
+        Load canonical raster standards from pipeline.yaml.
+        
+        Loads configuration values for:
+        - canonical_dpi: Target DPI (enforced via rescaling)
+        - memory_threshold_mb: Hybrid storage threshold
+        - alpha_policy: Alpha channel handling policy
+        - strip_icc_profile: Whether to strip ICC profiles
+        - resampling_method: DPI rescaling algorithm
+        """
+        config_path = Path("config/pipeline.yaml")
+        
+        if not config_path.exists():
+            logger.warning(f"Config file not found: {config_path}, using defaults")
+            self._set_default_config()
+            return
+        
+        try:
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f)
+            
+            # Extract canonical raster config
+            canon_config = config.get("canonical_raster", {})
+            
+            self.canonical_dpi = canon_config.get("canonical_dpi", 300)
+            self.memory_threshold_mb = canon_config.get("memory_threshold_mb", 50)
+            self.alpha_policy = AlphaPolicy(canon_config.get("alpha_policy", "FLATTEN_WHITE"))
+            self.strip_icc_profile = canon_config.get("strip_icc_profile", True)
+            self.resampling_method = canon_config.get("resampling_method", "LANCZOS")
+            
+            logger.debug(
+                f"Loaded config: canonical_dpi={self.canonical_dpi}, "
+                f"memory_threshold={self.memory_threshold_mb}MB, "
+                f"alpha_policy={self.alpha_policy.value}, "
+                f"resampling={self.resampling_method}"
+            )
+            
+        except Exception as e:
+            logger.warning(f"Failed to load config: {e}, using defaults")
+            self._set_default_config()
+    
+    def _set_default_config(self) -> None:
+        """Set default configuration values."""
+        self.canonical_dpi = 300
+        self.memory_threshold_mb = 50
+        self.alpha_policy = AlphaPolicy.FLATTEN_WHITE
+        self.strip_icc_profile = True
+        self.resampling_method = "LANCZOS"
     
     @property
     def metadata(self) -> StageMetadata:
         return StageMetadata(
             stage_number=1,
             name="Canonical Normalization",
-            description="Converts validated input into deterministic canonical raster",
-            version="1.0.0",
+            description="Converts validated input into deterministic canonical raster via modular pipeline",
+            version="2.0.0",  # Version 2.0: Modular architecture with DPI rescaling
             author="Weaver AI Team",
         )
     
@@ -141,130 +220,29 @@ class Stage1CanonicalNormalization(BaseStage[Stage1Input, Stage1Output]):
     
     def post_execute(self, output_data: Stage1Output) -> None:
         """
-        Validate output postconditions.
+        Validate output postconditions using raster_emitter validation.
         
-        Ensures canonical raster invariants:
+        Delegates to validate_canonical_raster() which checks:
         - Color mode is RGB
         - Bit depth is 8
-        - Pixel array file exists and is loadable
+        - Pixel array is loadable
         - Array shape matches (H, W, 3)
         - Array dtype is uint8
         - Repeat grid integrity maintained
         """
-        raster = output_data.canonical_raster
-        
-        # Invariant: Color mode must be RGB
-        if raster.color_mode != "RGB":
-            raise CanonicalizationError(
-                message=f"Post-normalization color mode is not RGB: {raster.color_mode}",
-                stage_number=1,
-                details={
-                    "color_mode": raster.color_mode,
-                    "expected": "RGB",
-                },
-            )
-        
-        # Invariant: Bit depth must be 8
-        if raster.bit_depth != 8:
-            raise CanonicalizationError(
-                message=f"Post-normalization bit depth is not 8: {raster.bit_depth}",
-                stage_number=1,
-                details={
-                    "bit_depth": raster.bit_depth,
-                    "expected": 8,
-                },
-            )
-        
-        # Invariant: Pixel array file must exist
-        pixel_array_path = Path(raster.pixel_array_path)
-        if not pixel_array_path.exists():
-            raise CanonicalizationError(
-                message=f"Canonical raster file not found: {raster.pixel_array_path}",
-                stage_number=1,
-                details={"pixel_array_path": raster.pixel_array_path},
-            )
-        
-        # Invariant: Pixel array must be loadable and have correct shape/dtype
-        try:
-            pixel_array = np.load(raster.pixel_array_path)
-        except Exception as e:
-            raise CanonicalizationError(
-                message=f"Failed to load canonical raster: {e}",
-                stage_number=1,
-                details={
-                    "pixel_array_path": raster.pixel_array_path,
-                    "error": str(e),
-                },
-            )
-        
-        # Invariant: Shape must be (H, W, 3)
-        if pixel_array.ndim != 3 or pixel_array.shape[2] != 3:
-            raise CanonicalizationError(
-                message=f"Canonical raster shape is not (H, W, 3): {pixel_array.shape}",
-                stage_number=1,
-                details={
-                    "shape": pixel_array.shape,
-                    "expected_channels": 3,
-                },
-            )
-        
-        # Invariant: Dtype must be uint8
-        if pixel_array.dtype != np.uint8:
-            raise CanonicalizationError(
-                message=f"Canonical raster dtype is not uint8: {pixel_array.dtype}",
-                stage_number=1,
-                details={
-                    "dtype": str(pixel_array.dtype),
-                    "expected": "uint8",
-                },
-            )
-        
-        # Invariant: Dimensions must match declared values
-        height, width, _ = pixel_array.shape
-        if width != raster.width_px or height != raster.height_px:
-            raise CanonicalizationError(
-                message=f"Canonical raster dimensions mismatch: array={width}x{height}, declared={raster.width_px}x{raster.height_px}",
-                stage_number=1,
-                details={
-                    "array_width": width,
-                    "array_height": height,
-                    "declared_width": raster.width_px,
-                    "declared_height": raster.height_px,
-                },
-            )
-        
-        # Invariant: Repeat grid integrity (must tile perfectly)
-        repeat_w = raster.repeat_unit_px["width"]
-        repeat_h = raster.repeat_unit_px["height"]
-        
-        if raster.width_px % repeat_w != 0:
-            raise CanonicalizationError(
-                message=f"Repeat grid violation: width {raster.width_px} is not divisible by repeat width {repeat_w}",
-                stage_number=1,
-                details={
-                    "width_px": raster.width_px,
-                    "repeat_width": repeat_w,
-                    "remainder": raster.width_px % repeat_w,
-                },
-            )
-        
-        if raster.height_px % repeat_h != 0:
-            raise CanonicalizationError(
-                message=f"Repeat grid violation: height {raster.height_px} is not divisible by repeat height {repeat_h}",
-                stage_number=1,
-                details={
-                    "height_px": raster.height_px,
-                    "repeat_height": repeat_h,
-                    "remainder": raster.height_px % repeat_h,
-                },
-            )
+        validate_canonical_raster(output_data.canonical_raster)
     
     def execute(self, input_data: Stage1Input) -> Stage1Output:
         """
-        Execute Stage 1: Canonical Normalization.
+        Execute Stage 1: Canonical Normalization via modular pipeline.
         
-        Converts input image into canonical RGB 8-bit representation
-        with perfect repeat grid alignment.
+        PIPELINE FLOW:
+        1. Load image
+        2. Normalize orientation (EXIF)
+        3. Normalize color space (RGB + ICC strip)
+        4. Canonicalize DPI (rescale pixels)
+        5. Validate repeat grid
+        6. Emit canonical raster (hybrid storage)
         
         Args:
             input_data: Stage 1 input with validated image metadata
@@ -275,10 +253,14 @@ class Stage1CanonicalNormalization(BaseStage[Stage1Input, Stage1Output]):
         start_time = time.time()
         transformations: List[str] = []
         
-        # Step 1: Load image from validated path
-        # WHY: Start with raw image data from Stage 0
+        logger.info(f"Starting Stage 1 normalization: {input_data.image_path}")
+        
+        # ===================================================================
+        # STEP 1: Load image from validated path
+        # ===================================================================
         try:
             img = Image.open(input_data.image_path)
+            logger.debug(f"Loaded image: {img.size}, mode={img.mode}")
         except Exception as e:
             raise CanonicalizationError(
                 message=f"Failed to load image: {e}",
@@ -290,189 +272,118 @@ class Stage1CanonicalNormalization(BaseStage[Stage1Input, Stage1Output]):
             )
         
         load_time_ms = int((time.time() - start_time) * 1000)
-        conversion_start = time.time()
+        pipeline_start = time.time()
         
-        # Step 2: Normalize orientation using EXIF transpose
-        # WHY: Remove EXIF rotation flags to get true pixel orientation.
-        # Some formats (JPEG, TIFF) store rotation in metadata rather than
-        # physically rotating pixels. This applies the rotation and clears flags.
-        try:
-            img_transposed = ImageOps.exif_transpose(img)
-            if img_transposed is not None:
-                if img_transposed.size != img.size:
-                    transformations.append("EXIF_transpose_rotated")
-                img = img_transposed
-            else:
-                img = img  # No EXIF orientation data
-        except Exception as e:
-            # If EXIF transpose fails, continue with original image
-            # (this is non-critical for lossless formats from Stage 0)
-            pass
-        
-        # Step 3: Normalize color space
-        # WHY: Downstream stages require consistent RGB representation.
-        # - RGBA → RGB with white background (manufacturing standard)
-        # - L (grayscale) → RGB via channel replication
-        # - P (palette) → RGB via palette lookup
-        # - 1 (1-bit) → RGB via conversion
+        original_size = img.size
         original_mode = img.mode
         
-        if img.mode == "RGBA":
-            # Convert RGBA to RGB with WHITE background composite
-            # WHY: Manufacturing equipment interprets absence of thread as white fabric.
-            # Alpha channel must be resolved to concrete color before CAM export.
-            rgb_img = Image.new("RGB", img.size, (255, 255, 255))
-            rgb_img.paste(img, mask=img.split()[3])  # Use alpha channel as mask
-            img = rgb_img
-            transformations.append("RGBA_to_RGB_white_background")
+        # ===================================================================
+        # STEP 2: Normalize orientation (OrientationNormalizer)
+        # ===================================================================
+        img = normalize_orientation(img)
+        if img.size != original_size:
+            transformations.append("EXIF_orientation_applied")
         
-        elif img.mode == "LA":
-            # Convert grayscale+alpha to RGB with white background
-            l_img = img.convert("L")
-            alpha = img.split()[1]
-            rgb_img = Image.new("RGB", img.size, (255, 255, 255))
-            gray_rgb = Image.merge("RGB", [l_img, l_img, l_img])
-            rgb_img.paste(gray_rgb, mask=alpha)
-            img = rgb_img
-            transformations.append("LA_to_RGB_white_background")
+        # ===================================================================
+        # STEP 3: Normalize color space (ColorSpaceNormalizer)
+        # ===================================================================
+        img, color_transforms = normalize_color_space(img, self.alpha_policy)
+        transformations.extend(color_transforms)
         
-        elif img.mode in ("L", "P", "1"):
-            # Convert grayscale, palette, or 1-bit to RGB
-            # WHY: Ensures consistent 3-channel representation
-            img = img.convert("RGB")
-            transformations.append(f"{original_mode}_to_RGB")
+        # ===================================================================
+        # STEP 4: Canonicalize DPI (DPICanonicalizer)
+        # ===================================================================
+        # Calculate new repeat unit after DPI rescaling
+        input_repeat_w = input_data.repeat_unit_px["width"]
+        input_repeat_h = input_data.repeat_unit_px["height"]
         
-        elif img.mode == "RGB":
-            # Already RGB - no conversion needed
-            pass
-        
-        else:
-            # Unsupported color mode (should never happen if Stage 0 validated)
-            raise CanonicalizationError(
-                message=f"Unsupported color mode: {img.mode}",
-                stage_number=1,
-                details={
-                    "color_mode": img.mode,
-                    "image_path": input_data.image_path,
-                },
-            )
-        
-        # Step 4: Normalize bit depth
-        # WHY: Ensure 8-bit per channel for deterministic processing.
-        # PIL's RGB mode is always 8-bit, but we explicitly verify this.
-        if img.mode != "RGB":
-            raise CanonicalizationError(
-                message=f"Color mode is not RGB after conversion: {img.mode}",
-                stage_number=1,
-                details={
-                    "mode_after_conversion": img.mode,
-                    "original_mode": original_mode,
-                },
-            )
-        
-        # Step 5: Set DPI metadata (without rescaling pixels)
-        # WHY: Preserve DPI information from Stage 0 for downstream reference.
-        # This does NOT rescale the pixel grid - only sets metadata.
-        img.info["dpi"] = (input_data.dpi, input_data.dpi)
-        
-        # Step 6: Assert repeat grid integrity
-        # WHY: Repeat unit must tile perfectly into image dimensions.
-        # If this fails, it indicates Stage 0 contract breach or data corruption.
-        repeat_w = input_data.repeat_unit_px["width"]
-        repeat_h = input_data.repeat_unit_px["height"]
-        
-        if img.width % repeat_w != 0:
-            raise CanonicalizationError(
-                message=f"Repeat grid violation: width {img.width} not divisible by repeat width {repeat_w}",
-                stage_number=1,
-                details={
-                    "width_px": img.width,
-                    "repeat_width": repeat_w,
-                    "remainder": img.width % repeat_w,
-                    "expected_stage": "Stage 0 should have caught this",
-                },
-            )
-        
-        if img.height % repeat_h != 0:
-            raise CanonicalizationError(
-                message=f"Repeat grid violation: height {img.height} not divisible by repeat height {repeat_h}",
-                stage_number=1,
-                details={
-                    "height_px": img.height,
-                    "repeat_height": repeat_h,
-                    "remainder": img.height % repeat_h,
-                    "expected_stage": "Stage 0 should have caught this",
-                },
-            )
-        
-        # Step 7: Convert to NumPy array
-        # WHY: NumPy provides deterministic in-memory tensor representation
-        # with explicit shape (H, W, 3) and dtype uint8.
-        try:
-            pixel_array = np.array(img, dtype=np.uint8)
-        except Exception as e:
-            raise CanonicalizationError(
-                message=f"Failed to convert image to NumPy array: {e}",
-                stage_number=1,
-                details={"error": str(e)},
-            )
-        
-        # Verify array shape
-        if pixel_array.ndim != 3 or pixel_array.shape[2] != 3:
-            raise CanonicalizationError(
-                message=f"NumPy array shape is not (H, W, 3): {pixel_array.shape}",
-                stage_number=1,
-                details={"shape": pixel_array.shape},
-            )
-        
-        # Step 8: Save to .npy file
-        # WHY: Store canonical raster as file for consumption by downstream stages.
-        # .npy format preserves exact array structure and dtype.
-        storage_dir = Path("storage") / input_data.pipeline_id
-        storage_dir.mkdir(parents=True, exist_ok=True)
-        
-        pixel_array_path = storage_dir / "canonical_raster.npy"
-        try:
-            np.save(str(pixel_array_path), pixel_array)
-        except Exception as e:
-            raise CanonicalizationError(
-                message=f"Failed to save canonical raster: {e}",
-                stage_number=1,
-                details={
-                    "pixel_array_path": str(pixel_array_path),
-                    "error": str(e),
-                },
-            )
-        
-        conversion_time_ms = int((time.time() - conversion_start) * 1000)
-        
-        # Step 9: Create CanonicalRaster object
-        canonical_raster = CanonicalRaster(
-            schema_version="stage1.v1",
-            width_px=pixel_array.shape[1],
-            height_px=pixel_array.shape[0],
-            dpi=input_data.dpi,
-            color_mode="RGB",
-            bit_depth=8,
-            pixel_array_path=str(pixel_array_path),
-            repeat_unit_px=input_data.repeat_unit_px,
+        img, dpi_metadata = canonicalize_dpi(
+            img=img,
+            input_dpi=input_data.dpi,
+            canonical_dpi=self.canonical_dpi,
+            repeat_width_px=input_repeat_w,
+            repeat_height_px=input_repeat_h,
+            resampling_method=self.resampling_method
         )
         
-        # Return Stage 1 output
+        if dpi_metadata["rescaled"]:
+            transformations.append(
+                f"DPI_rescaled_{input_data.dpi}to{self.canonical_dpi}_"
+                f"{dpi_metadata['resampling_method']}"
+            )
+        
+        # Update repeat unit to canonical dimensions
+        canonical_repeat_unit = {
+            "width": dpi_metadata["canonical_repeat"][0],
+            "height": dpi_metadata["canonical_repeat"][1]
+        }
+        
+        # ===================================================================
+        # STEP 5: Validate repeat grid (GridNormalizer)
+        # ===================================================================
+        validate_repeat_grid(
+            img=img,
+            repeat_width_px=canonical_repeat_unit["width"],
+            repeat_height_px=canonical_repeat_unit["height"]
+        )
+        
+        tile_metrics = calculate_tile_counts(
+            width_px=img.width,
+            height_px=img.height,
+            repeat_width_px=canonical_repeat_unit["width"],
+            repeat_height_px=canonical_repeat_unit["height"]
+        )
+        
+        pipeline_time_ms = int((time.time() - pipeline_start) * 1000)
+        
+        # ===================================================================
+        # STEP 6: Emit canonical raster (RasterEmitter)
+        # ===================================================================
+        storage_dir = Path("storage") / input_data.pipeline_id
+        
+        canonical_raster = emit_canonical_raster(
+            img=img,
+            pipeline_id=input_data.pipeline_id,
+            storage_dir=storage_dir,
+            dpi=self.canonical_dpi,
+            repeat_unit_px=canonical_repeat_unit,
+            memory_threshold_mb=self.memory_threshold_mb
+        )
+        
+        total_time_ms = int((time.time() - start_time) * 1000)
+        
+        logger.info(
+            f"Stage 1 complete: {original_size} -> {img.size}, "
+            f"{original_mode} -> RGB, "
+            f"{input_data.dpi}dpi -> {self.canonical_dpi}dpi "
+            f"({total_time_ms}ms)"
+        )
+        
+        # ===================================================================
+        # STEP 7: Return Stage 1 output
+        # ===================================================================
         return Stage1Output(
             stage_number=1,
             status=StageStatus.COMPLETED,
-            message=f"Image normalized to canonical RGB raster ({pixel_array.shape[1]}x{pixel_array.shape[0]})",
+            message=(
+                f"Image normalized to canonical RGB raster "
+                f"({canonical_raster.width_px}x{canonical_raster.height_px} @ {self.canonical_dpi}dpi)"
+            ),
             canonical_raster=canonical_raster,
             original_color_mode=original_mode,
             transformations_applied=transformations,
             metrics={
                 "load_time_ms": load_time_ms,
-                "conversion_time_ms": conversion_time_ms,
-                "total_time_ms": int((time.time() - start_time) * 1000),
-                "width_px": pixel_array.shape[1],
-                "height_px": pixel_array.shape[0],
-                "repeat_tiles_horizontal": pixel_array.shape[1] // repeat_w,
-                "repeat_tiles_vertical": pixel_array.shape[0] // repeat_h,
+                "pipeline_time_ms": pipeline_time_ms,
+                "total_time_ms": total_time_ms,
+                "original_size": f"{original_size[0]}x{original_size[1]}",
+                "canonical_size": f"{canonical_raster.width_px}x{canonical_raster.height_px}",
+                "original_dpi": input_data.dpi,
+                "canonical_dpi": self.canonical_dpi,
+                "dpi_scale_factor": dpi_metadata["scale_factor"],
+                "tiles_horizontal": tile_metrics["tiles_horizontal"],
+                "tiles_vertical": tile_metrics["tiles_vertical"],
+                "total_tiles": tile_metrics["total_tiles"],
+                "storage_type": "in_memory" if canonical_raster.pixel_array is not None else "file",
             },
         )

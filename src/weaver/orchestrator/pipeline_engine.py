@@ -264,12 +264,27 @@ class PipelineEngine:
             # Extract canonical raster from Stage 1 output
             raster = stage1_output.canonical_raster
             
+            # Handle hybrid storage: ensure raster is saved to file for Stage 2
+            # Stage 1 may store small images in-memory, but Stage 2 expects file path
+            if raster.pixel_array_path is None:
+                # In-memory storage: save to file
+                import numpy as np
+                from pathlib import Path
+                storage_dir = Path("storage") / context.pipeline_id
+                storage_dir.mkdir(parents=True, exist_ok=True)
+                raster_path = storage_dir / "canonical_raster.npy"
+                np.save(str(raster_path), raster.pixel_array)
+                canonical_raster_path = str(raster_path)
+            else:
+                # File-based storage: use existing path
+                canonical_raster_path = raster.pixel_array_path
+            
             # Pass .npy file directly - no redundant PNG creation/loading
             return Stage2Input(
                 pipeline_id=context.pipeline_id,
                 stage_number=stage_number,
                 metadata={},
-                canonical_raster_path=raster.pixel_array_path,
+                canonical_raster_path=canonical_raster_path,
                 width_px=raster.width_px,
                 height_px=raster.height_px,
                 dpi=raster.dpi,
