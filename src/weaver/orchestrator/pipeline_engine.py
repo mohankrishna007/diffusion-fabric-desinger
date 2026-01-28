@@ -256,22 +256,25 @@ class PipelineEngine:
             # Cast to Stage1Output
             if not isinstance(stage1_output, Stage1Output):
                 raise ValidationError(
-                    "Stage 1 ouput cast failed",
+                    "Stage 1 output cast failed",
                     stage_number=2,
                     details={"failed_cast": "Stage1Output"}
                 )
             
-            # Map Stage 1 output to Stage 2 input
-            # TODO: Replace with actual Stage1Output fields once Stage 1 is implemented
+            # Extract canonical raster from Stage 1 output
+            raster = stage1_output.canonical_raster
+            
+            # Pass .npy file directly - no redundant PNG creation/loading
             return Stage2Input(
                 pipeline_id=context.pipeline_id,
                 stage_number=stage_number,
-                canonical_image_path=context.source_file,  # Mock: use original source file
-                width_px=800,  # Mock: placeholder value
-                height_px=600,  # Mock: placeholder value
-                dpi=300,  # Mock: placeholder value
-                repeat_width_px=200,  # Mock: placeholder value
-                repeat_height_px=200   # Mock: placeholder value
+                metadata={},
+                canonical_raster_path=raster.pixel_array_path,
+                width_px=raster.width_px,
+                height_px=raster.height_px,
+                dpi=raster.dpi,
+                repeat_width_px=raster.repeat_unit_px["width"],
+                repeat_height_px=raster.repeat_unit_px["height"],
             )
         
         # For other stages, create basic StageInput

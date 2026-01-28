@@ -48,13 +48,13 @@ class Stage2Input(StageInput):
     """
     Input schema for Stage 2.
     
-    Receives canonical image from Stage 1 or falls back to Stage 0's raw image.
+    Receives canonical raster from Stage 1 as .npy NumPy array file.
     """
     model_config = ConfigDict(frozen=True, extra="forbid")
     
-    canonical_image_path: str = Field(
+    canonical_raster_path: str = Field(
         ...,
-        description="Path to canonical normalized image from Stage 1"
+        description="Path to canonical raster .npy file from Stage 1"
     )
     width_px: int = Field(..., gt=0, description="Image width in pixels")
     height_px: int = Field(..., gt=0, description="Image height in pixels")
@@ -191,9 +191,9 @@ class Stage2StructuralIntent(BaseStage[Stage2Input, Stage2Output]):
         region_masks_dir = output_dir / "region_masks"
         ensure_directory(str(region_masks_dir))
         
-        # Load canonical image
-        logger.info(f"Loading canonical image: {input_data.canonical_image_path}")
-        image = self._load_image(input_data.canonical_image_path)
+        # Load canonical raster from Stage 1 .npy file
+        logger.info(f"Loading canonical raster: {input_data.canonical_raster_path}")
+        image = self._load_canonical_raster(input_data.canonical_raster_path)
         
         # 1. Extract edges using Canny
         logger.info("Extracting edges with Canny detection")
@@ -290,33 +290,53 @@ class Stage2StructuralIntent(BaseStage[Stage2Input, Stage2Output]):
             structural_metadata=metadata_dict
         )
     
-    def _load_image(self, image_path: str) -> np.ndarray:
+    def _load_canonical_raster(self, raster_path: str) -> np.ndarray:
         """
-        Load image and convert to grayscale for processing.
+        Load canonical raster from Stage 1 .npy file and convert to grayscale.
+        
+        Stage 1 outputs RGB (H, W, 3) uint8 NumPy array.
+        Stage 2 needs grayscale for edge detection.
         
         Args:
-            image_path: Path to image file
+            raster_path: Path to .npy file containing canonical raster
         
         Returns:
-            Grayscale image as numpy array
+            Grayscale image as numpy array (H, W) uint8
         
         Raises:
-            ValidationError: If image cannot be loaded
+            ValidationError: If raster cannot be loaded or is invalid
         """
         try:
-            image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-            if image is None:
+            # Load NumPy array from .npy file (no redundant image decode)
+            pixel_array = np.load(raster_path)
+            
+            # Validate shape (H, W, 3) from Stage 1
+            if pixel_array.ndim != 3 or pixel_array.shape[2] != 3:
                 raise ValidationError(
-                    f"Failed to load image: {image_path}",
+                    f"Invalid canonical raster shape: {pixel_array.shape}, expected (H, W, 3)",
                     stage_number=2,
-                    details={"image_path": image_path}
+                    details={"raster_path": raster_path, "shape": pixel_array.shape}
                 )
-            return image
+            
+            # Validate dtype uint8 from Stage 1
+            if pixel_array.dtype != np.uint8:
+                raise ValidationError(
+                    f"Invalid canonical raster dtype: {pixel_array.dtype}, expected uint8",
+                    stage_number=2,
+                    details={"raster_path": raster_path, "dtype": str(pixel_array.dtype)}
+                )
+            
+            # Convert RGB to grayscale using standard luminosity weights
+            # WHY: Edge detection requires grayscale. Use OpenCV's standard conversion.
+            grayscale = cv2.cvtColor(pixel_array, cv2.COLOR_RGB2GRAY)
+            
+            return grayscale
+            
         except Exception as e:
             raise ValidationError(
-                f"Error loading image: {str(e)}",
+                f"Error loading canonical raster: {str(e)}",
                 stage_number=2,
-                details={"image_path": image_path, "error": str(e)}
+                details={"raster_path": raster_path, "error": str(e)}
             ) from e
     
     def _extract_edges(self, image: np.ndarray) -> np.ndarray:
