@@ -360,7 +360,67 @@ class Stage1CanonicalNormalization(BaseStage[Stage1Input, Stage1Output]):
         )
         
         # ===================================================================
-        # STEP 7: Return Stage 1 output
+        # STEP 7: Save stage artifacts
+        # ===================================================================
+        from weaver.shared.utils import get_stage_artifact_dir, save_artifact_json
+        
+        artifact_dir = get_stage_artifact_dir(input_data.pipeline_id, 1)
+        
+        # Save canonical raster metadata
+        canonical_metadata = {
+            "width_px": canonical_raster.width_px,
+            "height_px": canonical_raster.height_px,
+            "dpi": canonical_raster.dpi,
+            "color_mode": canonical_raster.color_mode,
+            "bit_depth": canonical_raster.bit_depth,
+            "repeat_unit_px": canonical_raster.repeat_unit_px,
+            "pixel_array_path": canonical_raster.pixel_array_path,
+            "storage_type": "in_memory" if canonical_raster.pixel_array is not None else "file"
+        }
+        
+        save_artifact_json(artifact_dir, "canonical_raster_metadata.json", canonical_metadata)
+        
+        # Save stage 1 complete metadata
+        stage_metadata = {
+            "stage_number": 1,
+            "stage_name": "Canonical Normalization",
+            "status": "COMPLETED",
+            "pipeline_id": input_data.pipeline_id,
+            "original_color_mode": original_mode,
+            "transformations_applied": transformations,
+            "normalization_config": {
+                "canonical_dpi": self.canonical_dpi,
+                "alpha_policy": self.alpha_policy.value,
+                "strip_icc_profile": self.strip_icc_profile,
+                "resampling_method": self.resampling_method
+            },
+            "metrics": {
+                "load_time_ms": load_time_ms,
+                "pipeline_time_ms": pipeline_time_ms,
+                "total_time_ms": total_time_ms,
+                "original_size": f"{original_size[0]}x{original_size[1]}",
+                "canonical_size": f"{canonical_raster.width_px}x{canonical_raster.height_px}",
+                "original_dpi": input_data.dpi,
+                "canonical_dpi": self.canonical_dpi,
+                "dpi_scale_factor": dpi_metadata["scale_factor"],
+                "tiles_horizontal": tile_metrics["tiles_horizontal"],
+                "tiles_vertical": tile_metrics["tiles_vertical"],
+                "total_tiles": tile_metrics["total_tiles"],
+                "storage_type": "in_memory" if canonical_raster.pixel_array is not None else "file"
+            },
+            "canonical_raster": canonical_metadata
+        }
+        
+        save_artifact_json(artifact_dir, "stage_metadata.json", stage_metadata)
+        
+        # Save a visual preview (PNG) of the canonical raster
+        preview_path = artifact_dir / "canonical_preview.png"
+        img.save(preview_path, "PNG")
+        
+        logger.info(f"Stage 1 artifacts saved to: {artifact_dir}")
+        
+        # ===================================================================
+        # STEP 8: Return Stage 1 output
         # ===================================================================
         return Stage1Output(
             stage_number=1,
@@ -372,6 +432,10 @@ class Stage1CanonicalNormalization(BaseStage[Stage1Input, Stage1Output]):
             canonical_raster=canonical_raster,
             original_color_mode=original_mode,
             transformations_applied=transformations,
+            data={
+                "artifact_dir": str(artifact_dir),
+                "preview_path": str(preview_path)
+            },
             metrics={
                 "load_time_ms": load_time_ms,
                 "pipeline_time_ms": pipeline_time_ms,

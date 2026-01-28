@@ -190,10 +190,10 @@ class Stage2StructuralIntent(BaseStage[Stage2Input, Stage2Output]):
         """
         logger.info(f"Starting Stage 2 execution: {input_data.pipeline_id}")
         
-        # Create output directory structure using global workspace constant
-        workspace_base = Path(WORKSPACE_BASE_DIR)
-        output_dir = workspace_base / input_data.pipeline_id / "structural_intent"
-        ensure_directory(str(output_dir))
+        # Create output directory structure using standardized artifact storage
+        from weaver.shared.utils import get_stage_artifact_dir
+        
+        output_dir = get_stage_artifact_dir(input_data.pipeline_id, 2)
         
         region_masks_dir = output_dir / "region_masks"
         ensure_directory(str(region_masks_dir))
@@ -275,7 +275,46 @@ class Stage2StructuralIntent(BaseStage[Stage2Input, Stage2Output]):
         with open(metadata_path, "w") as f:
             json.dump(metadata_dict, f, indent=2)
         
+        # 8. Save comprehensive stage metadata
+        from weaver.shared.utils import save_artifact_json
+        
+        stage_metadata = {
+            "stage_number": 2,
+            "stage_name": "Structural Intent Definition",
+            "status": "COMPLETED",
+            "pipeline_id": input_data.pipeline_id,
+            "input_dimensions": {
+                "width_px": input_data.width_px,
+                "height_px": input_data.height_px,
+                "dpi": input_data.dpi,
+                "repeat_width_px": input_data.repeat_width_px,
+                "repeat_height_px": input_data.repeat_height_px
+            },
+            "processing_config": {
+                "canny_threshold1": self.canny_threshold1,
+                "canny_threshold2": self.canny_threshold2,
+                "boundary_margin": self.boundary_margin
+            },
+            "structural_analysis": metadata_dict,
+            "artifacts": {
+                "edge_map": str(edge_map_path),
+                "skeleton_map": str(skeleton_map_path),
+                "region_masks_dir": str(region_masks_dir),
+                "repeat_boundary_mask": str(boundary_mask_path),
+                "structural_metadata": str(metadata_path)
+            },
+            "metrics": {
+                "edge_pixels": int(np.sum(edge_map > 0)),
+                "skeleton_nodes": node_count,
+                "skeleton_edges": edge_count,
+                "regions_detected": region_count
+            }
+        }
+        
+        save_artifact_json(output_dir, "stage_metadata.json", stage_metadata)
+        
         logger.info(f"Stage 2 completed successfully: {input_data.pipeline_id}")
+        logger.info(f"Stage 2 artifacts saved to: {output_dir}")
         
         return Stage2Output(
             stage_number=2,

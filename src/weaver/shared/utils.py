@@ -128,3 +128,63 @@ def get_file_size(file_path: str) -> int:
         File size in bytes
     """
     return Path(file_path).stat().st_size
+
+
+def get_stage_artifact_dir(pipeline_id: str, stage_number: int, base_dir: str = "storage") -> Path:
+    """
+    Get standardized artifact directory for a stage.
+    
+    Creates directory structure: storage/<pipeline_id>/stage_<N>/
+    
+    Args:
+        pipeline_id: Pipeline execution ID
+        stage_number: Stage number (0-7)
+        base_dir: Base storage directory (default: "storage")
+    
+    Returns:
+        Path to stage artifact directory
+    """
+    artifact_dir = Path(base_dir) / pipeline_id / f"stage_{stage_number}"
+    ensure_directory(str(artifact_dir))
+    return artifact_dir
+
+
+def save_artifact_json(artifact_dir: Path, filename: str, data: Dict[str, Any]) -> Path:
+    """
+    Save artifact data as JSON file.
+    
+    Args:
+        artifact_dir: Artifact directory path
+        filename: Output filename (e.g., "metadata.json")
+        data: Data to serialize
+    
+    Returns:
+        Path to saved file
+    """
+    import json
+    
+    output_path = artifact_dir / filename
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, default=str)
+    
+    return output_path
+
+
+def copy_artifact_file(source_path: str, artifact_dir: Path, filename: str) -> Path:
+    """
+    Copy a file to the artifact directory.
+    
+    Args:
+        source_path: Source file path
+        artifact_dir: Artifact directory path
+        filename: Destination filename
+    
+    Returns:
+        Path to copied file
+    """
+    import shutil
+    
+    dest_path = artifact_dir / filename
+    shutil.copy2(source_path, dest_path)
+    
+    return dest_path

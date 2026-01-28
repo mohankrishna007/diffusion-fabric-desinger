@@ -363,12 +363,52 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
             f"{repeat_result['tiles_x']}x{repeat_result['tiles_y']} tiles"
         )
         
+        # STEP 11: Save stage artifacts
+        from weaver.shared.utils import get_stage_artifact_dir, save_artifact_json
+        
+        artifact_dir = get_stage_artifact_dir(input_data.pipeline_id, 0)
+        
+        # Save input descriptor as JSON
+        input_descriptor_path = save_artifact_json(
+            artifact_dir,
+            "input_descriptor.json",
+            input_descriptor.model_dump()
+        )
+        
+        # Save complete stage 0 output metadata
+        stage_metadata = {
+            "stage_number": 0,
+            "stage_name": "Input Acquisition",
+            "status": "COMPLETED",
+            "pipeline_id": input_data.pipeline_id,
+            "input_descriptor": input_descriptor.model_dump(),
+            "source_seal": source_seal,
+            "validation_results": {
+                "pre_decode_check": pre_decode_result,
+                "format_validation": format_result,
+                "metadata_validation": metadata_result,
+                "dimension_validation": dimension_result,
+                "repeat_validation": repeat_result,
+                "resource_validation": resource_result
+            },
+            "metrics": input_descriptor.metrics
+        }
+        
+        save_artifact_json(artifact_dir, "stage_metadata.json", stage_metadata)
+        
+        logger.info(f"Stage 0 artifacts saved to: {artifact_dir}")
+        
         return Stage0Output(
             stage_number=0,
             status=StageStatus.COMPLETED,
             message="Input acquisition successful - design sealed as source of truth",
             input_descriptor=input_descriptor,
-            data={"raw_hash": raw_hash, "source_seal": source_seal},
+            data={
+                "raw_hash": raw_hash,
+                "source_seal": source_seal,
+                "artifact_dir": str(artifact_dir),
+                "input_descriptor_path": str(input_descriptor_path)
+            },
             metrics=input_descriptor.metrics
         )
     
