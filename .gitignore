@@ -79,6 +79,7 @@ logs/
 
 # Pipeline artifacts
 data/
+storage/
 output/
 cache/
 temp/

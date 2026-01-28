@@ -188,3 +188,27 @@ class BoundaryInconsistencyError(ValidationError):
     would cause repeat violations in downstream stages.
     """
     pass
+
+
+# ============================================================================
+# STAGE 1 - CANONICAL NORMALIZATION EXCEPTIONS
+# Representation normalization with fail-fast invariant enforcement
+# ============================================================================
+
+class CanonicalizationError(ValidationError):
+    """
+    Raised when normalization invariants are violated.
+    
+    RATIONALE: Stage 1 converts validated but representation-ambiguous
+    images into a single deterministic canonical form. If post-normalization
+    invariants fail (repeat grid misalignment, color conversion failure,
+    bit depth issues), this indicates either Stage 0 contract breach or
+    corruption during normalization. No recovery attempts - fail loudly.
+    
+    Invariants enforced:
+    - Color mode must be RGB (8-bit per channel)
+    - Orientation normalized (no EXIF rotation flags)
+    - Repeat grid integrity (width % repeat_w == 0, height % repeat_h == 0)
+    - Pixel array shape (H, W, 3), dtype uint8
+    """
+    pass

@@ -229,6 +229,14 @@ class PipelineEngine:
                 pipeline_id=context.pipeline_id,
                 stage_number=stage_number,
                 metadata={},
+                image_path=descriptor.image_path,
+                width_px=descriptor.width_px,
+                height_px=descriptor.height_px,
+                dpi=descriptor.dpi,
+                repeat_unit_px=descriptor.repeat_unit_px,
+                color_mode=descriptor.color_mode,
+                bit_depth=descriptor.bit_depth,
+                raw_hash=descriptor.raw_hash,
             )
         
         # Stage 2: Structural Intent Definition - uses Stage 1 output
@@ -248,22 +256,40 @@ class PipelineEngine:
             # Cast to Stage1Output
             if not isinstance(stage1_output, Stage1Output):
                 raise ValidationError(
-                    "Stage 1 ouput cast failed",
+                    "Stage 1 output cast failed",
                     stage_number=2,
                     details={"failed_cast": "Stage1Output"}
                 )
             
-            # Map Stage 1 output to Stage 2 input
-            # TODO: Replace with actual Stage1Output fields once Stage 1 is implemented
+            # Extract canonical raster from Stage 1 output
+            raster = stage1_output.canonical_raster
+            
+            # Handle hybrid storage: ensure raster is saved to file for Stage 2
+            # Stage 1 may store small images in-memory, but Stage 2 expects file path
+            if raster.pixel_array_path is None:
+                # In-memory storage: save to file
+                import numpy as np
+                from pathlib import Path
+                storage_dir = Path("storage") / context.pipeline_id
+                storage_dir.mkdir(parents=True, exist_ok=True)
+                raster_path = storage_dir / "canonical_raster.npy"
+                np.save(str(raster_path), raster.pixel_array)
+                canonical_raster_path = str(raster_path)
+            else:
+                # File-based storage: use existing path
+                canonical_raster_path = raster.pixel_array_path
+            
+            # Pass .npy file directly - no redundant PNG creation/loading
             return Stage2Input(
                 pipeline_id=context.pipeline_id,
                 stage_number=stage_number,
-                canonical_image_path=context.source_file,  # Mock: use original source file
-                width_px=800,  # Mock: placeholder value
-                height_px=600,  # Mock: placeholder value
-                dpi=300,  # Mock: placeholder value
-                repeat_width_px=200,  # Mock: placeholder value
-                repeat_height_px=200   # Mock: placeholder value
+                metadata={},
+                canonical_raster_path=canonical_raster_path,
+                width_px=raster.width_px,
+                height_px=raster.height_px,
+                dpi=raster.dpi,
+                repeat_width_px=raster.repeat_unit_px["width"],
+                repeat_height_px=raster.repeat_unit_px["height"],
             )
         
         # For other stages, create basic StageInput

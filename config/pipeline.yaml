@@ -27,6 +27,32 @@ image:
     - ".tif"
   output_format: ".bmp"
 
+# Canonical raster standards (Stage 1 normalization target)
+canonical_raster:
+  # DPI enforcement - Stage 1 will rescale pixels to match this canonical DPI
+  canonical_dpi: 300
+  
+  # Hybrid storage threshold - images larger than this are saved to .npy file
+  # Smaller images stored in-memory as NumPy arrays
+  memory_threshold_mb: 50
+  
+  # Color mode normalization target
+  color_mode: "RGB"
+  
+  # Bit depth normalization target (per channel)
+  bit_depth: 8
+  
+  # Alpha channel handling policy
+  # Options: FLATTEN_WHITE (composite on white), FLATTEN_BLACK (composite on black), STRIP (remove alpha)
+  alpha_policy: "FLATTEN_WHITE"
+  
+  # ICC color profile handling - strip embedded profiles for deterministic color interpretation
+  strip_icc_profile: true
+  
+  # Resampling algorithm for DPI rescaling
+  # Options: LANCZOS (high quality), BICUBIC, BILINEAR, NEAREST (preserve exact pixels)
+  resampling_method: "LANCZOS"
+
 # Stage-specific configurations
 stages:
   stage_0:

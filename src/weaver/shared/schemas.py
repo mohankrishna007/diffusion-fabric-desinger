@@ -2,10 +2,18 @@
 Shared Pydantic schemas for pipeline data contracts.
 """
 
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Any, Dict, Optional
+from pydantic import BaseModel, Field, ConfigDict, field_validator
+from typing import Any, Dict, Optional, Union
 from datetime import datetime
 from enum import Enum
+import numpy as np
+
+
+class AlphaPolicy(str, Enum):
+    """Policy for handling alpha channel during canonical normalization."""
+    FLATTEN_WHITE = "FLATTEN_WHITE"  # Composite on white background (255, 255, 255)
+    FLATTEN_BLACK = "FLATTEN_BLACK"  # Composite on black background (0, 0, 0)
+    STRIP = "STRIP"  # Remove alpha channel, keep RGB only
 
 
 class StageStatus(str, Enum):
@@ -233,4 +241,90 @@ class ErrorResponse(BaseModel):
     )
     
     detail: ErrorDetail = Field(..., description="Error details")
+
+
+# ============================================================================
+# STAGE 1 - CANONICAL NORMALIZATION SCHEMAS
+# Deterministic internal representation for manufacturing pipeline
+# ============================================================================
+
+class CanonicalRaster(BaseModel):
+    """
+    Canonical Raster - Single Deterministic Internal Representation.
+    
+    This is the NORMALIZED, UNAMBIGUOUS representation that all downstream
+    stages consume. It removes ALL representational ambiguity:
+    - Color mode: RGB only (no RGBA, L, P, or exotic modes)
+    - Bit depth: 8-bit per channel (no 16-bit, 1-bit, or indexed)
+    - Orientation: normalized (EXIF rotation applied, flag cleared)
+    - Repeat grid: perfectly aligned (integer tile boundaries)
+    - DPI: canonical DPI enforced (pixels rescaled if needed)
+    - ICC profiles: stripped (deterministic color interpretation)
+    - Encoding: hybrid storage (in-memory NumPy array OR .npy file based on size)
+    
+    This object is INTERNAL ONLY - never serialized to PNG/TIFF/BMP.
+    
+    Hybrid Storage Strategy:
+    - Small images (< memory_threshold_mb): Store as in-memory NumPy array
+    - Large images (>= memory_threshold_mb): Store as .npy file with path reference
+    - Exactly one of pixel_array or pixel_array_path must be set
+    """
+    
+    model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)
+    
+    schema_version: str = Field(
+        default="stage1.v1",
+        description="Canonical raster schema version"
+    )
+    width_px: int = Field(..., description="Image width in pixels (after DPI normalization)")
+    height_px: int = Field(..., description="Image height in pixels (after DPI normalization)")
+    dpi: int = Field(..., description="Canonical DPI (enforced via rescaling)")
+    color_mode: str = Field(
+        default="RGB",
+        description="Color mode (always RGB after normalization)"
+    )
+    bit_depth: int = Field(
+        default=8,
+        description="Bit depth per channel (always 8 after normalization)"
+    )
+    pixel_array: Optional[np.ndarray] = Field(
+        default=None,
+        description="In-memory NumPy array (H, W, 3) uint8 for small images"
+    )
+    pixel_array_path: Optional[str] = Field(
+        default=None,
+        description="Path to .npy file containing NumPy array (H, W, 3) uint8 for large images"
+    )
+    repeat_unit_px: Dict[str, int] = Field(
+        ...,
+        description="Repeat unit {width, height} in pixels (after DPI normalization)"
+    )
+    
+    @field_validator('pixel_array', 'pixel_array_path')
+    @classmethod
+    def validate_hybrid_storage(cls, v, info):
+        """Ensure exactly one of pixel_array or pixel_array_path is set."""
+        # This validator runs per-field, so we check during model validation
+        return v
+    
+    def model_post_init(self, __context):
+        """Validate that exactly one storage method is used."""
+        has_array = self.pixel_array is not None
+        has_path = self.pixel_array_path is not None
+        
+        if not (has_array or has_path):
+            raise ValueError("CanonicalRaster must have either pixel_array or pixel_array_path set")
+        
+        if has_array and has_path:
+            raise ValueError("CanonicalRaster cannot have both pixel_array and pixel_array_path set")
+        
+        # Validate array shape if in-memory
+        if has_array:
+            if self.pixel_array.shape != (self.height_px, self.width_px, 3):
+                raise ValueError(
+                    f"pixel_array shape {self.pixel_array.shape} does not match "
+                    f"declared dimensions ({self.height_px}, {self.width_px}, 3)"
+                )
+            if self.pixel_array.dtype != np.uint8:
+                raise ValueError(f"pixel_array dtype must be uint8, got {self.pixel_array.dtype}")
 
