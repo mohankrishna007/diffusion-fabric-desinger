@@ -229,6 +229,14 @@ class PipelineEngine:
                 pipeline_id=context.pipeline_id,
                 stage_number=stage_number,
                 metadata={},
+                image_path=descriptor.image_path,
+                width_px=descriptor.width_px,
+                height_px=descriptor.height_px,
+                dpi=descriptor.dpi,
+                repeat_unit_px=descriptor.repeat_unit_px,
+                color_mode=descriptor.color_mode,
+                bit_depth=descriptor.bit_depth,
+                raw_hash=descriptor.raw_hash,
             )
         
         # Stage 2: Structural Intent Definition - uses Stage 1 output

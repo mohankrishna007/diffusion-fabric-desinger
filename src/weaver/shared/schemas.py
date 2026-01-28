@@ -234,3 +234,50 @@ class ErrorResponse(BaseModel):
     
     detail: ErrorDetail = Field(..., description="Error details")
 
+
+# ============================================================================
+# STAGE 1 - CANONICAL NORMALIZATION SCHEMAS
+# Deterministic internal representation for manufacturing pipeline
+# ============================================================================
+
+class CanonicalRaster(BaseModel):
+    """
+    Canonical Raster - Single Deterministic Internal Representation.
+    
+    This is the NORMALIZED, UNAMBIGUOUS representation that all downstream
+    stages consume. It removes ALL representational ambiguity:
+    - Color mode: RGB only (no RGBA, L, P, or exotic modes)
+    - Bit depth: 8-bit per channel (no 16-bit, 1-bit, or indexed)
+    - Orientation: normalized (EXIF rotation applied, flag cleared)
+    - Repeat grid: perfectly aligned (integer tile boundaries)
+    - Encoding: in-memory NumPy array stored as .npy file
+    
+    This object is INTERNAL ONLY - never serialized to PNG/TIFF/BMP.
+    """
+    
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    
+    schema_version: str = Field(
+        default="stage1.v1",
+        description="Canonical raster schema version"
+    )
+    width_px: int = Field(..., description="Image width in pixels")
+    height_px: int = Field(..., description="Image height in pixels")
+    dpi: int = Field(..., description="DPI (carried forward from Stage 0)")
+    color_mode: str = Field(
+        default="RGB",
+        description="Color mode (always RGB after normalization)"
+    )
+    bit_depth: int = Field(
+        default=8,
+        description="Bit depth per channel (always 8 after normalization)"
+    )
+    pixel_array_path: str = Field(
+        ...,
+        description="Path to .npy file containing NumPy array (H, W, 3) uint8"
+    )
+    repeat_unit_px: Dict[str, int] = Field(
+        ...,
+        description="Repeat unit {width, height} in pixels (unchanged from Stage 0)"
+    )
+
