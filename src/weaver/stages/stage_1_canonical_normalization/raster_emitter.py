@@ -47,8 +47,9 @@ def emit_canonical_raster(
     3. Type-safe (NumPy array with enforced shape/dtype)
     
     Hybrid Storage Strategy:
-    - Small images (< threshold): Store as in-memory NumPy array in CanonicalRaster
-    - Large images (>= threshold): Save as .npy file, store path in CanonicalRaster
+    - ALWAYS save .npy file (single source of truth on disk)
+    - Small images (< threshold): ALSO store in-memory for performance
+    - Large images (>= threshold): Only file path (memory efficient)
     
     Why .npy format?
     - Lossless (exact dtype and shape preservation)
@@ -105,10 +106,16 @@ def emit_canonical_raster(
             f"size={memory_size_mb:.2f}MB, threshold={memory_threshold_mb}MB"
         )
         
-        # Decide storage strategy
+        # ALWAYS save to file (source of truth)
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        npy_path = storage_dir / "canonical_raster.npy"
+        np.save(str(npy_path), pixel_array)
+        logger.debug(f"Saved canonical raster to {npy_path} ({memory_size_mb:.2f}MB)")
+        
+        # Decide whether to ALSO keep in-memory for performance
         if memory_size_mb < memory_threshold_mb:
-            # Small image: store in-memory
-            logger.debug("Using in-memory storage (below threshold)")
+            # Small image: keep in-memory AND file
+            logger.debug(f"Keeping in-memory (below {memory_threshold_mb}MB threshold)")
             
             return CanonicalRaster(
                 schema_version="stage1.v1",
@@ -118,21 +125,12 @@ def emit_canonical_raster(
                 color_mode="RGB",
                 bit_depth=8,
                 pixel_array=pixel_array,
-                pixel_array_path=None,
+                pixel_array_path=str(npy_path),
                 repeat_unit_px=repeat_unit_px
             )
         else:
-            # Large image: save to file
-            logger.debug("Using file-based storage (above threshold)")
-            
-            # Ensure storage directory exists
-            storage_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Save as .npy file
-            npy_path = storage_dir / "canonical_raster.npy"
-            np.save(str(npy_path), pixel_array)
-            
-            logger.debug(f"Saved canonical raster to {npy_path}")
+            # Large image: file only (memory efficient)
+            logger.debug(f"File only (above {memory_threshold_mb}MB threshold)")
             
             return CanonicalRaster(
                 schema_version="stage1.v1",
@@ -230,7 +228,8 @@ def validate_canonical_raster(raster: CanonicalRaster) -> None:
     - Schema version is current
     - Color mode is RGB
     - Bit depth is 8
-    - Exactly one storage method (in-memory or file)
+    - Path is always set (source of truth)
+    - Array is optional for small images (performance)
     - Pixel array loadable and matches declared dimensions
     - Repeat grid divisibility
     
@@ -261,19 +260,16 @@ def validate_canonical_raster(raster: CanonicalRaster) -> None:
             details={"bit_depth": raster.bit_depth}
         )
     
-    # Validate storage (already checked by Pydantic model_post_init, but double-check)
+    # Validate storage: path must always be present (source of truth)
     has_array = raster.pixel_array is not None
     has_path = raster.pixel_array_path is not None
     
-    if not (has_array or has_path):
+    if not has_path:
         raise CanonicalizationError(
-            "CanonicalRaster has neither pixel_array nor pixel_array_path set"
+            "CanonicalRaster must have pixel_array_path set (source of truth)"
         )
     
-    if has_array and has_path:
-        raise CanonicalizationError(
-            "CanonicalRaster has both pixel_array and pixel_array_path set"
-        )
+    # Array is optional (small images have both for performance)
     
     # Validate pixel array loadable
     try:

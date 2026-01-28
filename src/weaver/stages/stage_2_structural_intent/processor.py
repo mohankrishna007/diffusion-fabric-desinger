@@ -48,13 +48,20 @@ class Stage2Input(StageInput):
     """
     Input schema for Stage 2.
     
-    Receives canonical raster from Stage 1 as .npy NumPy array file.
+    Receives canonical raster from Stage 1 either as:
+    - File path (.npy) for large images
+    - In-memory array for small images (with path as backup)
+    - Or both for optimal performance
     """
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)
     
     canonical_raster_path: str = Field(
         ...,
-        description="Path to canonical raster .npy file from Stage 1"
+        description="Path to canonical raster .npy file from Stage 1 (always present)"
+    )
+    canonical_raster_array: Optional[np.ndarray] = Field(
+        default=None,
+        description="Optional in-memory array for small images (performance optimization)"
     )
     width_px: int = Field(..., gt=0, description="Image width in pixels")
     height_px: int = Field(..., gt=0, description="Image height in pixels")
@@ -192,8 +199,13 @@ class Stage2StructuralIntent(BaseStage[Stage2Input, Stage2Output]):
         ensure_directory(str(region_masks_dir))
         
         # Load canonical raster from Stage 1 .npy file
-        logger.info(f"Loading canonical raster: {input_data.canonical_raster_path}")
-        image = self._load_canonical_raster(input_data.canonical_raster_path)
+        # Use in-memory array if available (performance), otherwise load from file
+        if input_data.canonical_raster_array is not None:
+            logger.info("Using in-memory canonical raster (performance optimization)")
+            image = input_data.canonical_raster_array
+        else:
+            logger.info(f"Loading canonical raster from file: {input_data.canonical_raster_path}")
+            image = self._load_canonical_raster(input_data.canonical_raster_path)
         
         # 1. Extract edges using Canny
         logger.info("Extracting edges with Canny detection")

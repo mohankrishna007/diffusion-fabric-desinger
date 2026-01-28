@@ -289,11 +289,11 @@ class CanonicalRaster(BaseModel):
     )
     pixel_array: Optional[np.ndarray] = Field(
         default=None,
-        description="In-memory NumPy array (H, W, 3) uint8 for small images"
+        description="In-memory NumPy array (H, W, 3) uint8 for small images (optional performance optimization)"
     )
     pixel_array_path: Optional[str] = Field(
         default=None,
-        description="Path to .npy file containing NumPy array (H, W, 3) uint8 for large images"
+        description="Path to .npy file (always present as source of truth)"
     )
     repeat_unit_px: Dict[str, int] = Field(
         ...,
@@ -303,20 +303,19 @@ class CanonicalRaster(BaseModel):
     @field_validator('pixel_array', 'pixel_array_path')
     @classmethod
     def validate_hybrid_storage(cls, v, info):
-        """Ensure exactly one of pixel_array or pixel_array_path is set."""
-        # This validator runs per-field, so we check during model validation
+        """Validate storage fields."""
         return v
     
     def model_post_init(self, __context):
-        """Validate that exactly one storage method is used."""
+        """Validate that at least path is set (array is optional for small images)."""
         has_array = self.pixel_array is not None
         has_path = self.pixel_array_path is not None
         
-        if not (has_array or has_path):
-            raise ValueError("CanonicalRaster must have either pixel_array or pixel_array_path set")
+        if not has_path:
+            raise ValueError("CanonicalRaster must have pixel_array_path set (source of truth)")
         
-        if has_array and has_path:
-            raise ValueError("CanonicalRaster cannot have both pixel_array and pixel_array_path set")
+        # Both can be set for small images (file + in-memory for performance)
+        # Only path for large images (memory efficient)
         
         # Validate array shape if in-memory
         if has_array:

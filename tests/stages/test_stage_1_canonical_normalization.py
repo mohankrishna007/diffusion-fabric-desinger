@@ -255,7 +255,7 @@ class TestHybridStorage:
     """Test in-memory vs file-based storage."""
     
     def test_small_image_in_memory(self, temp_workspace, sample_rgb_image):
-        """Test that small images are stored in-memory."""
+        """Test that small images are stored both in-memory AND as file."""
         # 600x600x3 = ~1MB < 50MB threshold
         raster = emit_canonical_raster(
             img=sample_rgb_image,
@@ -265,13 +265,16 @@ class TestHybridStorage:
             repeat_unit_px={"width": 300, "height": 300},
             memory_threshold_mb=50
         )
+        # Small images have BOTH for performance
         assert raster.pixel_array is not None
-        assert raster.pixel_array_path is None
+        assert raster.pixel_array_path is not None
         assert raster.pixel_array.shape == (600, 600, 3)
         assert raster.pixel_array.dtype == np.uint8
+        # File also exists
+        assert Path(raster.pixel_array_path).exists()
     
     def test_large_image_file_based(self, temp_workspace):
-        """Test that large images are saved to file."""
+        """Test that large images are saved to file only (no in-memory copy)."""
         # Create large image > 50MB
         large_img = Image.new("RGB", (5000, 5000), color=(128, 128, 128))
         raster = emit_canonical_raster(
@@ -282,6 +285,7 @@ class TestHybridStorage:
             repeat_unit_px={"width": 1000, "height": 1000},
             memory_threshold_mb=50
         )
+        # Large images: file only (no in-memory to save RAM)
         assert raster.pixel_array is None
         assert raster.pixel_array_path is not None
         assert Path(raster.pixel_array_path).exists()
@@ -304,7 +308,8 @@ class TestHybridStorage:
             repeat_unit_px={"width": 1000, "height": 1000},
             memory_threshold_mb=50
         )
-        # Should be file-based at boundary
+        # At boundary: file only (above threshold)
+        assert raster.pixel_array is None
         assert raster.pixel_array_path is not None
 
 
@@ -418,6 +423,7 @@ class TestInvariantValidation:
             color_mode="L",  # Invalid - not RGB
             bit_depth=8,
             pixel_array=np.zeros((600, 600, 3), dtype=np.uint8),
+            pixel_array_path=str(temp_workspace / "test.npy"),
             repeat_unit_px={"width": 300, "height": 300}
         )
         
@@ -436,6 +442,7 @@ class TestInvariantValidation:
             color_mode="RGB",
             bit_depth=16,  # Invalid - not 8
             pixel_array=np.zeros((600, 600, 3), dtype=np.uint8),
+            pixel_array_path=str(temp_workspace / "test.npy"),
             repeat_unit_px={"width": 300, "height": 300}
         )
         
