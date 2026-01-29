@@ -37,6 +37,7 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from weaver.diffusion.stages.base import BaseStage, StageMetadata
+from weaver.diffusion.orchestrator.stage_registry import stage_registry
 from weaver.shared.schemas import StageInput, StageOutput, StageStatus
 from weaver.shared.exceptions import InputSchemaError
 from weaver.shared.constants import MIN_DPI, MAX_DPI
@@ -211,6 +212,13 @@ class Stage0Output(StageOutput):
     )
 
 
+@stage_registry.register(
+    stage_id="input_acquisition",
+    display_name="Input Acquisition",
+    description="RAW DESIGN SOURCE OF TRUTH - Fast-fail input validation with zero tolerance for invalid inputs",
+    dependencies=[],
+    version="2.0.0"
+)
 class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
     """
     Stage 0: Input Acquisition - v2.0.0 Modularized
@@ -241,7 +249,8 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
     @property
     def metadata(self) -> StageMetadata:
         return StageMetadata(
-            stage_number=0,
+            stage_id="input_acquisition",
+            stage_number=None,  # Set dynamically by orchestrator
             name="Input Acquisition",
             description="RAW DESIGN SOURCE OF TRUTH - Fast-fail input validation",
             version="2.0.0",
@@ -330,7 +339,8 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
         # STEP 10: Emit canonical Input Descriptor
         logger.info("Creating canonical Input Descriptor")
         input_descriptor = InputDescriptor(
-            stage_number=0,
+            stage_id=input_data.stage_id,
+            stage_number=input_data.stage_number,
             status=StageStatus.COMPLETED,
             message="Input validated and sealed as source of truth",
             schema_version="stage0.v1",
@@ -399,7 +409,8 @@ class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
         logger.info(f"Stage 0 artifacts saved to: {artifact_dir}")
         
         return Stage0Output(
-            stage_number=0,
+            stage_id=input_data.stage_id,
+            stage_number=input_data.stage_number,
             status=StageStatus.COMPLETED,
             message="Input acquisition successful - design sealed as source of truth",
             input_descriptor=input_descriptor,

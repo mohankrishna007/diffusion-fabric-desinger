@@ -44,6 +44,7 @@ import numpy as np
 from PIL import Image
 
 from weaver.diffusion.stages.base import BaseStage, StageMetadata
+from weaver.diffusion.orchestrator.stage_registry import stage_registry
 from weaver.shared.schemas import (
     StageInput,
     StageOutput,
@@ -109,6 +110,13 @@ class Stage1Output(StageOutput):
     )
 
 
+@stage_registry.register(
+    stage_id="canonical_normalization",
+    display_name="Canonical Normalization",
+    description="Converts validated image into deterministic canonical raster representation",
+    dependencies=["input_acquisition"],
+    version="1.0.0"
+)
 class Stage1CanonicalNormalization(BaseStage[Stage1Input, Stage1Output]):
     """
     Stage 1: Canonical Normalization
@@ -182,7 +190,8 @@ class Stage1CanonicalNormalization(BaseStage[Stage1Input, Stage1Output]):
     @property
     def metadata(self) -> StageMetadata:
         return StageMetadata(
-            stage_number=1,
+            stage_id="canonical_normalization",
+            stage_number=None,  # Set dynamically by orchestrator
             name="Canonical Normalization",
             description="Converts validated input into deterministic canonical raster via modular pipeline",
             version="2.0.0",  # Version 2.0: Modular architecture with DPI rescaling
@@ -423,7 +432,8 @@ class Stage1CanonicalNormalization(BaseStage[Stage1Input, Stage1Output]):
         # STEP 8: Return Stage 1 output
         # ===================================================================
         return Stage1Output(
-            stage_number=1,
+            stage_id=input_data.stage_id,
+            stage_number=input_data.stage_number,
             status=StageStatus.COMPLETED,
             message=(
                 f"Image normalized to canonical RGB raster "

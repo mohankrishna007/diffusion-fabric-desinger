@@ -17,6 +17,7 @@ TODO for Developer:
 """
 
 from weaver.diffusion.stages.base import BaseStage, StageMetadata
+from weaver.diffusion.orchestrator.stage_registry import stage_registry
 from weaver.shared.schemas import StageInput, StageOutput, StageStatus
 
 
@@ -32,6 +33,13 @@ class Stage5Output(StageOutput):
     pass
 
 
+@stage_registry.register(
+    stage_id="geometry_cleanup",
+    display_name="Geometry Cleanup",
+    description="Clean and optimize geometry for manufacturing constraints",
+    dependencies=["repeat_enforcement"],
+    version="1.0.0"
+)
 class Stage5GeometryCleanup(BaseStage[Stage5Input, Stage5Output]):
     """
     Stage 5: Manufacturing Geometry Cleanup
@@ -45,7 +53,8 @@ class Stage5GeometryCleanup(BaseStage[Stage5Input, Stage5Output]):
     @property
     def metadata(self) -> StageMetadata:
         return StageMetadata(
-            stage_number=5,
+            stage_id="geometry_cleanup",
+            stage_number=None,
             name="Manufacturing Geometry Cleanup",
             description="Translating digital pixels into weaveable geometry",
             version="1.0.0",
@@ -67,7 +76,8 @@ class Stage5GeometryCleanup(BaseStage[Stage5Input, Stage5Output]):
         # TODO: Implement stage logic
         
         return Stage5Output(
-            stage_number=5,
+            stage_id=input_data.stage_id,
+            stage_number=input_data.stage_number,
             status=StageStatus.COMPLETED,
             message="Stage 5 execution placeholder - awaiting implementation",
             data={},

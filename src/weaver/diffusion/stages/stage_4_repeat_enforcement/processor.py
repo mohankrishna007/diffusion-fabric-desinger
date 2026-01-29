@@ -17,6 +17,7 @@ TODO for Developer:
 """
 
 from weaver.diffusion.stages.base import BaseStage, StageMetadata
+from weaver.diffusion.orchestrator.stage_registry import stage_registry
 from weaver.shared.schemas import StageInput, StageOutput, StageStatus
 
 
@@ -32,6 +33,13 @@ class Stage4Output(StageOutput):
     pass
 
 
+@stage_registry.register(
+    stage_id="repeat_enforcement",
+    display_name="Repeat Enforcement",
+    description="Ensure perfect tiling integrity with zero-tolerance validation",
+    dependencies=["diffusion_refinement"],
+    version="1.0.0"
+)
 class Stage4RepeatEnforcement(BaseStage[Stage4Input, Stage4Output]):
     """
     Stage 4: Repeat & Boundary Enforcement
@@ -45,7 +53,8 @@ class Stage4RepeatEnforcement(BaseStage[Stage4Input, Stage4Output]):
     @property
     def metadata(self) -> StageMetadata:
         return StageMetadata(
-            stage_number=4,
+            stage_id="repeat_enforcement",
+            stage_number=None,
             name="Repeat & Boundary Enforcement",
             description="Guaranteeing perfect infinite tiling",
             version="1.0.0",
@@ -67,7 +76,8 @@ class Stage4RepeatEnforcement(BaseStage[Stage4Input, Stage4Output]):
         # TODO: Implement stage logic
         
         return Stage4Output(
-            stage_number=4,
+            stage_id=input_data.stage_id,
+            stage_number=input_data.stage_number,
             status=StageStatus.COMPLETED,
             message="Stage 4 execution placeholder - awaiting implementation",
             data={},

@@ -8,6 +8,7 @@ import streamlit as st
 from typing import Dict, Any, Optional, Callable
 
 from weaver.diffusion.service import DiffusionPipelineService
+from weaver.shared.config_loader import load_pipeline_config
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,18 @@ class PipelineService:
         Args:
             workspace_base_dir: Base directory for pipeline workspaces
         """
-        self.service = DiffusionPipelineService(workspace_base_dir=workspace_base_dir)
+        # Load pipeline configuration
+        try:
+            config = load_pipeline_config()
+            logger.info(f"Loaded pipeline configuration with {len(config.get('stages', []))} stages")
+        except Exception as e:
+            logger.warning(f"Failed to load pipeline configuration: {e}. Using empty config.")
+            config = {}
+        
+        self.service = DiffusionPipelineService(
+            workspace_base_dir=workspace_base_dir,
+            config=config
+        )
         logger.info("Initialized Streamlit Pipeline Service (wrapping DiffusionPipelineService)")
 
     

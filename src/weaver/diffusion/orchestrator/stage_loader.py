@@ -1,29 +1,29 @@
 """
-Stage loader - Dynamically discovers and loads pipeline stages.
+Stage loader - Dynamically discovers and loads pipeline stages using registry pattern.
 """
 
-import importlib
-from typing import Type, Dict
+from typing import Dict, List
 from weaver.diffusion.stages.base import BaseStage, StageMetadata
+from weaver.diffusion.orchestrator.stage_registry import stage_registry, StageRegistration
 from weaver.shared.exceptions import StageNotFoundError, ConfigurationError
 
 
 class StageLoader:
     """
-    Loads and manages pipeline stage instances.
-    Discovers stages by importing their modules and instantiating stage classes.
+    Loads and manages pipeline stage instances using the stage registry.
+    Provides caching and lazy loading of stages.
     """
     
     def __init__(self):
-        self._stage_cache: Dict[int, BaseStage] = {}
-        self._stage_metadata: Dict[int, StageMetadata] = {}
+        self._stage_cache: Dict[str, BaseStage] = {}
+        self._stage_metadata: Dict[str, StageMetadata] = {}
     
-    def load_stage(self, stage_number: int) -> BaseStage:
+    def load_stage(self, stage_id: str) -> BaseStage:
         """
-        Load a stage by its number.
+        Load a stage by its identifier.
         
         Args:
-            stage_number: Stage number (0-7)
+            stage_id: Stage identifier (e.g., "input_acquisition")
         
         Returns:
             Instantiated stage
@@ -32,88 +32,80 @@ class StageLoader:
             StageNotFoundError: If stage cannot be loaded
         """
         # Check cache first
-        if stage_number in self._stage_cache:
-            return self._stage_cache[stage_number]
-        
-        # Map stage numbers to module paths
-        stage_map = {
-            0: "weaver.diffusion.stages.stage_0_input_acquisition",
-            1: "weaver.diffusion.stages.stage_1_canonical_normalization",
-            2: "weaver.diffusion.stages.stage_2_structural_intent",
-            3: "weaver.diffusion.stages.stage_3_diffusion_refinement",
-            4: "weaver.diffusion.stages.stage_4_repeat_enforcement",
-            5: "weaver.diffusion.stages.stage_5_geometry_cleanup",
-            6: "weaver.diffusion.stages.stage_6_color_constraint",
-            7: "weaver.diffusion.stages.stage_7_precam_validation",
-        }
-        
-        stage_class_map = {
-            0: "Stage0InputAcquisition",
-            1: "Stage1CanonicalNormalization",
-            2: "Stage2StructuralIntent",
-            3: "Stage3DiffusionRefinement",
-            4: "Stage4RepeatEnforcement",
-            5: "Stage5GeometryCleanup",
-            6: "Stage6ColorConstraint",
-            7: "Stage7PreCAMValidation",
-        }
-        
-        if stage_number not in stage_map:
-            raise StageNotFoundError(stage_number)
+        if stage_id in self._stage_cache:
+            return self._stage_cache[stage_id]
         
         try:
-            # Import the stage module
-            module_path = stage_map[stage_number]
-            module = importlib.import_module(module_path)
-            
-            # Get the stage class
-            class_name = stage_class_map[stage_number]
-            stage_class: Type[BaseStage] = getattr(module, class_name)
+            # Get stage class from registry
+            stage_class = stage_registry.get_stage_class(stage_id)
             
             # Instantiate the stage
             stage_instance = stage_class()
             
             # Cache the stage
-            self._stage_cache[stage_number] = stage_instance
-            self._stage_metadata[stage_number] = stage_instance.metadata
+            self._stage_cache[stage_id] = stage_instance
+            self._stage_metadata[stage_id] = stage_instance.metadata
             
             return stage_instance
             
-        except ImportError as e:
-            raise StageNotFoundError(stage_number) from e
-        except AttributeError as e:
+        except StageNotFoundError:
+            raise
+        except Exception as e:
             raise ConfigurationError(
-                f"Stage {stage_number} module missing expected class {class_name}",
-                details={"stage_number": stage_number, "class_name": class_name}
+                f"Failed to instantiate stage '{stage_id}': {str(e)}"
             ) from e
     
-    def load_all_stages(self) -> Dict[int, BaseStage]:
+    def load_all_stages(self, stage_ids: List[str]) -> Dict[str, BaseStage]:
         """
-        Load all stages (0-7).
+        Load multiple stages.
+        
+        Args:
+            stage_ids: List of stage identifiers to load
         
         Returns:
-            Dictionary mapping stage numbers to stage instances
+            Dictionary mapping stage IDs to stage instances
         """
         stages = {}
-        for stage_number in range(8):
-            stages[stage_number] = self.load_stage(stage_number)
+        for stage_id in stage_ids:
+            stages[stage_id] = self.load_stage(stage_id)
         return stages
     
-    def get_stage_metadata(self, stage_number: int) -> StageMetadata:
+    def get_stage_metadata(self, stage_id: str) -> StageMetadata:
         """
         Get metadata for a stage without fully loading it.
         
         Args:
-            stage_number: Stage number
+            stage_id: Stage identifier
         
         Returns:
             Stage metadata
         """
-        if stage_number not in self._stage_metadata:
-            stage = self.load_stage(stage_number)
-            self._stage_metadata[stage_number] = stage.metadata
+        if stage_id not in self._stage_metadata:
+            stage = self.load_stage(stage_id)
+            self._stage_metadata[stage_id] = stage.metadata
         
-        return self._stage_metadata[stage_number]
+        return self._stage_metadata[stage_id]
+    
+    def get_registration(self, stage_id: str) -> StageRegistration:
+        """
+        Get full registration information for a stage.
+        
+        Args:
+            stage_id: Stage identifier
+        
+        Returns:
+            Stage registration
+        """
+        return stage_registry.get_registration(stage_id)
+    
+    def get_all_registrations(self) -> Dict[str, StageRegistration]:
+        """
+        Get all registered stages.
+        
+        Returns:
+            Dictionary mapping stage IDs to registrations
+        """
+        return stage_registry.get_all_registrations()
     
     def clear_cache(self) -> None:
         """Clear the stage cache."""

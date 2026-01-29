@@ -16,6 +16,14 @@ from typing import Optional, Dict, Any
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+# Import stages to trigger registration (must be before pipeline service init)
+try:
+    import weaver.diffusion.stages
+    stage_count = weaver.diffusion.stages.get_registered_stage_count()
+    print(f"Streamlit UI: Registered {stage_count} pipeline stages")
+except Exception as e:
+    print(f"Streamlit UI: Warning - Failed to register stages: {e}")
+
 from ui.pipeline_service import PipelineService
 from ui.config_detector import ConfigDetector
 from weaver.shared.constants import (

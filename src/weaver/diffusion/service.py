@@ -349,13 +349,20 @@ class DiffusionPipelineService:
         progress_callback: Callable[[int, str], None]
     ) -> Dict[str, Any]:
         """Execute pipeline with progress callbacks."""
-        from weaver.shared.constants import STAGE_NAMES
+        # Get dynamic stage execution order from pipeline engine
+        execution_order = self.pipeline_engine.get_execution_order()
         
         # Call progress for each stage
         # (In production, this would integrate with actual stage execution)
-        for stage_num in range(8):
-            stage_name = STAGE_NAMES.get(stage_num, f"Stage {stage_num}")
-            progress_callback(stage_num, stage_name)
+        for stage_index, stage_id in enumerate(execution_order):
+            # Get stage registration for display name
+            try:
+                registration = self.pipeline_engine.stage_loader.get_registration(stage_id)
+                stage_name = registration.display_name
+            except Exception:
+                stage_name = stage_id.replace('_', ' ').title()
+            
+            progress_callback(stage_index, stage_name)
         
         # Execute the actual pipeline
         result = self.pipeline_engine.execute(image_path, config)
@@ -382,7 +389,7 @@ class DiffusionPipelineService:
             'stage_outputs': result.get('stage_outputs', {}),
             'created_at': created_at.isoformat() if created_at else None,
             'completed_at': completed_at.isoformat() if completed_at else None,
-            'completed_stages': list(range(8)) if result.get('status') == PipelineStatus.COMPLETED else [],
+            'completed_stages': list(result.get('stage_outputs', {}).keys()) if result.get('status') == PipelineStatus.COMPLETED else [],
             'errors': pipeline_info.get('errors', [])
         }
     

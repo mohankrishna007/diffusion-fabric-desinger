@@ -31,6 +31,7 @@ from skimage.morphology import skeletonize, label
 from skimage.measure import regionprops
 
 from weaver.diffusion.stages.base import BaseStage, StageMetadata
+from weaver.diffusion.orchestrator.stage_registry import stage_registry
 from weaver.shared.schemas import StageInput, StageOutput, StageStatus
 from weaver.shared.constants import WORKSPACE_BASE_DIR
 from weaver.shared.exceptions import (
@@ -128,6 +129,13 @@ class Stage2Output(StageOutput):
     )
 
 
+@stage_registry.register(
+    stage_id="structural_intent",
+    display_name="Structural Intent Definition",
+    description="Extract and lock structural invariants using classical CV techniques",
+    dependencies=["canonical_normalization"],
+    version="1.0.0"
+)
 class Stage2StructuralIntent(BaseStage[Stage2Input, Stage2Output]):
     """
     Stage 2: Structural Intent Definition
@@ -166,7 +174,8 @@ class Stage2StructuralIntent(BaseStage[Stage2Input, Stage2Output]):
     @property
     def metadata(self) -> StageMetadata:
         return StageMetadata(
-            stage_number=2,
+            stage_id="structural_intent",
+            stage_number=None,
             name="Structural Intent Definition",
             description="Extract and lock geometric invariants (edges, skeleton, regions, boundaries)",
             version="1.0.0",
@@ -317,7 +326,8 @@ class Stage2StructuralIntent(BaseStage[Stage2Input, Stage2Output]):
         logger.info(f"Stage 2 artifacts saved to: {output_dir}")
         
         return Stage2Output(
-            stage_number=2,
+            stage_id=input_data.stage_id,
+            stage_number=input_data.stage_number,
             status=StageStatus.COMPLETED,
             message="Structural intent extracted and validated - geometric invariants locked",
             data={

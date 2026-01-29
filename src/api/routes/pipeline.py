@@ -13,6 +13,7 @@ from weaver.shared.schemas import (
     PipelineStatus
 )
 from weaver.shared.exceptions import PipelineExecutionError, WeaverError
+from weaver.shared.config_loader import load_pipeline_config
 from datetime import datetime
 import logging
 
@@ -20,9 +21,27 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Load pipeline configuration
+try:
+    pipeline_config = load_pipeline_config()
+    logger.info(f"Loaded pipeline config with keys: {list(pipeline_config.keys())}")
+    if 'stages' in pipeline_config:
+        logger.info(f"Config has {len(pipeline_config['stages'])} stages")
+    else:
+        logger.warning("Config loaded but has no 'stages' key")
+except Exception as e:
+    logger.error(f"Failed to load pipeline configuration: {e}", exc_info=True)
+    # Use empty config as fallback - will fail gracefully if stages not registered
+    pipeline_config = {}
+
 # Global diffusion pipeline service instance
 # Using the shared service layer for consistent interface across API, UI, and package usage
-pipeline_service = DiffusionPipelineService()
+try:
+    pipeline_service = DiffusionPipelineService(config=pipeline_config)
+    logger.info("Pipeline service initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize pipeline service: {e}", exc_info=True)
+    raise
 
 
 @router.post("/execute", response_model=PipelineExecutionResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -255,16 +274,24 @@ async def list_stages():
     """
     try:
         # Access pipeline engine through service for stage metadata
+        from weaver.diffusion.orchestrator.stage_registry import stage_registry
+        
         stages = []
-        for stage_number in range(8):
-            metadata = pipeline_service.pipeline_engine.stage_loader.get_stage_metadata(stage_number)
-            stages.append({
-                "stage_number": metadata.stage_number,
-                "name": metadata.name,
-                "description": metadata.description,
-                "version": metadata.version,
-                "author": metadata.author
-            })
+        registrations = stage_registry.get_all_registrations()
+        execution_order = pipeline_service.pipeline_engine.get_execution_order()
+        
+        for stage_index, stage_id in enumerate(execution_order):
+            registration = registrations.get(stage_id)
+            if registration:
+                stages.append({
+                    "stage_id": stage_id,
+                    "stage_number": stage_index,
+                    "name": registration.display_name,
+                    "description": registration.description,
+                    "version": registration.version,
+                    "enabled": registration.enabled,
+                    "dependencies": registration.dependencies
+                })
         return stages
     
     except Exception as e:

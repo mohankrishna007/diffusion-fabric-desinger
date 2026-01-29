@@ -17,6 +17,7 @@ TODO for Developer:
 """
 
 from weaver.diffusion.stages.base import BaseStage, StageMetadata
+from weaver.diffusion.orchestrator.stage_registry import stage_registry
 from weaver.shared.schemas import StageInput, StageOutput, StageStatus
 
 
@@ -32,6 +33,13 @@ class Stage6Output(StageOutput):
     pass
 
 
+@stage_registry.register(
+    stage_id="color_constraint",
+    display_name="Color Constraint",
+    description="Apply color palette constraints for manufacturing requirements",
+    dependencies=["geometry_cleanup"],
+    version="1.0.0"
+)
 class Stage6ColorConstraint(BaseStage[Stage6Input, Stage6Output]):
     """
     Stage 6: Color & Thread Constraint Enforcement
@@ -45,7 +53,8 @@ class Stage6ColorConstraint(BaseStage[Stage6Input, Stage6Output]):
     @property
     def metadata(self) -> StageMetadata:
         return StageMetadata(
-            stage_number=6,
+            stage_id="color_constraint",
+            stage_number=None,
             name="Color & Thread Constraint Enforcement",
             description="Locking design to loom's physical capacity",
             version="1.0.0",
@@ -67,7 +76,8 @@ class Stage6ColorConstraint(BaseStage[Stage6Input, Stage6Output]):
         # TODO: Implement stage logic
         
         return Stage6Output(
-            stage_number=6,
+            stage_id=input_data.stage_id,
+            stage_number=input_data.stage_number,
             status=StageStatus.COMPLETED,
             message="Stage 6 execution placeholder - awaiting implementation",
             data={},

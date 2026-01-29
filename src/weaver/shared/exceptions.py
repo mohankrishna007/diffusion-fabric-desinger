@@ -22,8 +22,15 @@ class PipelineError(WeaverError):
 class StageError(WeaverError):
     """Base exception for stage-specific errors."""
     
-    def __init__(self, message: str, stage_number: int, details: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, 
+        message: str, 
+        stage_number: Optional[int] = None, 
+        stage_id: Optional[str] = None, 
+        details: Optional[Dict[str, Any]] = None
+    ):
         self.stage_number = stage_number
+        self.stage_id = stage_id
         super().__init__(message, details)
 
 
@@ -40,20 +47,28 @@ class ConfigurationError(WeaverError):
 class StageNotFoundError(PipelineError):
     """Raised when a required stage cannot be loaded."""
     
-    def __init__(self, stage_number: int):
+    def __init__(self, stage_identifier: Any):
+        identifier_str = str(stage_identifier)
         super().__init__(
-            f"Stage {stage_number} not found or cannot be loaded",
-            details={"stage_number": stage_number}
+            f"Stage '{identifier_str}' not found or cannot be loaded",
+            details={"stage_identifier": stage_identifier}
         )
 
 
 class ContractViolationError(ValidationError):
     """Raised when a stage violates its input/output contract."""
     
-    def __init__(self, stage_number: int, violations: list[str]):
+    def __init__(
+        self, 
+        violations: list[str], 
+        stage_number: Optional[int] = None, 
+        stage_id: Optional[str] = None
+    ):
+        stage_ref = stage_id or f"stage {stage_number}" if stage_number is not None else "unknown stage"
         super().__init__(
-            f"Stage {stage_number} violated its contract",
+            f"Stage '{stage_ref}' violated its contract",
             stage_number=stage_number,
+            stage_id=stage_id,
             details={"violations": violations}
         )
 
@@ -71,10 +86,17 @@ class PipelineExecutionError(PipelineError):
 class StageTimeoutError(StageError):
     """Raised when a stage execution exceeds timeout."""
     
-    def __init__(self, stage_number: int, timeout_seconds: float):
+    def __init__(
+        self, 
+        timeout_seconds: float, 
+        stage_number: Optional[int] = None, 
+        stage_id: Optional[str] = None
+    ):
+        stage_ref = stage_id or f"stage {stage_number}" if stage_number is not None else "unknown stage"
         super().__init__(
-            f"Stage {stage_number} exceeded timeout of {timeout_seconds}s",
+            f"Stage '{stage_ref}' exceeded timeout of {timeout_seconds}s",
             stage_number=stage_number,
+            stage_id=stage_id,
             details={"timeout_seconds": timeout_seconds}
         )
 

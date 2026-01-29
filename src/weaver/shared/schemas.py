@@ -45,7 +45,8 @@ class StageInput(BaseModel):
     )
     
     pipeline_id: str = Field(..., description="Unique pipeline execution ID")
-    stage_number: int = Field(..., ge=0, le=7, description="Stage number (0-7)")
+    stage_id: str = Field(..., description="Stage identifier")
+    stage_number: Optional[int] = Field(default=None, description="Stage execution order (optional)")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
@@ -59,7 +60,8 @@ class StageOutput(BaseModel):
         extra='forbid'
     )
     
-    stage_number: int = Field(..., ge=0, le=7, description="Stage number (0-7)")
+    stage_id: str = Field(..., description="Stage identifier")
+    stage_number: Optional[int] = Field(default=None, description="Stage execution order (optional)")
     status: StageStatus = Field(..., description="Execution status")
     message: str = Field(default="", description="Status message")
     data: Dict[str, Any] = Field(default_factory=dict, description="Output data")

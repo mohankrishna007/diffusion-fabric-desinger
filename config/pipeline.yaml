@@ -4,7 +4,6 @@
 pipeline:
   name: "Diffusion Fabric Designer"
   version: "1.0.0"
-  stage_count: 8
 
 # Global manufacturing constraints
 manufacturing:
@@ -18,7 +17,7 @@ manufacturing:
 image:
   default_dpi: 300
   color_space: "RGB"
-  # LOSSLESS FORMATS ONLY - JPEG forbidden per Stage 0 mandate
+  # LOSSLESS FORMATS ONLY - JPEG forbidden per manufacturing mandate
   # Lossy compression destroys thread-level precision needed for CAM export
   supported_formats:
     - ".bmp"
@@ -27,9 +26,9 @@ image:
     - ".tif"
   output_format: ".bmp"
 
-# Canonical raster standards (Stage 1 normalization target)
+# Canonical raster standards (normalization target)
 canonical_raster:
-  # DPI enforcement - Stage 1 will rescale pixels to match this canonical DPI
+  # DPI enforcement - normalization will rescale pixels to match this canonical DPI
   canonical_dpi: 300
   
   # Hybrid storage threshold - images larger than this are saved to .npy file
@@ -53,55 +52,89 @@ canonical_raster:
   # Options: LANCZOS (high quality), BICUBIC, BILINEAR, NEAREST (preserve exact pixels)
   resampling_method: "LANCZOS"
 
-# Stage-specific configurations
+# Dynamic stage configuration
+# Stages are executed in the order defined here
+# Each stage can declare dependencies on previous stages
 stages:
-  stage_0:
+  - id: "input_acquisition"
     name: "Input Acquisition"
-    timeout_seconds: 60
-    # Note: Validation limits (DPI, dimensions, file size) are defined in
-    # src/weaver/shared/constants.py as immutable manufacturing constraints
+    class_name: "Stage0InputAcquisition"
+    enabled: true
+    dependencies: []
+    config:
+      timeout_seconds: 60
+      # Note: Validation limits (DPI, dimensions, file size) are defined in
+      # src/weaver/shared/constants.py as immutable manufacturing constraints
     
-  stage_1:
+  - id: "canonical_normalization"
     name: "Canonical Normalization"
-    timeout_seconds: 120
-    target_dpi: 300
+    class_name: "Stage1CanonicalNormalization"
+    enabled: true
+    dependencies: ["input_acquisition"]
+    config:
+      timeout_seconds: 120
+      target_dpi: 300
     
-  stage_2:
+  - id: "structural_intent"
     name: "Structural Intent Definition"
-    timeout_seconds: 180
-    edge_detection_method: "canny"
-    canny_threshold1: 50
-    canny_threshold2: 150
+    class_name: "Stage2StructuralIntent"
+    enabled: true
+    dependencies: ["canonical_normalization"]
+    config:
+      timeout_seconds: 180
+      edge_detection_method: "canny"
+      canny_threshold1: 50
+      canny_threshold2: 150
     
-  stage_3:
+  - id: "diffusion_refinement"
     name: "Controlled Diffusion Refinement"
-    timeout_seconds: 1800  # 30 minutes
-    denoise_strength: 0.3  # Low to preserve structure
-    model: "stable-diffusion-v1.5"
-    use_controlnet: true
+    class_name: "Stage3DiffusionRefinement"
+    enabled: true
+    dependencies: ["structural_intent"]
+    config:
+      timeout_seconds: 1800  # 30 minutes
+      denoise_strength: 0.3  # Low to preserve structure
+      model: "stable-diffusion-v1.5"
+      use_controlnet: true
     
-  stage_4:
+  - id: "repeat_enforcement"
     name: "Repeat & Boundary Enforcement"
-    timeout_seconds: 120
-    border_tolerance: 0  # Zero tolerance
+    class_name: "Stage4RepeatEnforcement"
+    enabled: true
+    dependencies: ["diffusion_refinement"]
+    config:
+      timeout_seconds: 120
+      border_tolerance: 0  # Zero tolerance
     
-  stage_5:
+  - id: "geometry_cleanup"
     name: "Manufacturing Geometry Cleanup"
-    timeout_seconds: 180
-    min_feature_width: 2
-    morphology_kernel_size: 3
-    remove_islands: true
+    class_name: "Stage5GeometryCleanup"
+    enabled: true
+    dependencies: ["repeat_enforcement"]
+    config:
+      timeout_seconds: 180
+      min_feature_width: 2
+      morphology_kernel_size: 3
+      remove_islands: true
     
-  stage_6:
+  - id: "color_constraint"
     name: "Color & Thread Constraint Enforcement"
-    timeout_seconds: 120
-    max_colors: 16
-    quantization_method: "kmeans"
+    class_name: "Stage6ColorConstraint"
+    enabled: true
+    dependencies: ["geometry_cleanup"]
+    config:
+      timeout_seconds: 120
+      max_colors: 16
+      quantization_method: "kmeans"
     
-  stage_7:
+  - id: "precam_validation"
     name: "Pre-CAM Validation Firewall"
-    timeout_seconds: 60
-    zero_tolerance: true
+    class_name: "Stage7PreCAMValidation"
+    enabled: true
+    dependencies: ["color_constraint"]
+    config:
+      timeout_seconds: 60
+      zero_tolerance: true
 
 # Logging configuration
 logging:

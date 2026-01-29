@@ -190,9 +190,8 @@ def main():
     
     parser.add_argument(
         "--stage", "-s",
-        type=int,
-        choices=range(8),
-        help="Inspect specific stage only (0-7)"
+        type=str,
+        help="Inspect specific stage only (use stage ID like 'input_acquisition')"
     )
     
     parser.add_argument(

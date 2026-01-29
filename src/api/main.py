@@ -7,6 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes import pipeline, health
 import logging
 
+# Import stages to trigger registration decorators
+# This must happen before any pipeline operations
+try:
+    import weaver.diffusion.stages
+    logging.info(f"Loaded {weaver.diffusion.stages.get_registered_stage_count()} stages")
+except Exception as e:
+    logging.warning(f"Failed to auto-register stages: {e}")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,

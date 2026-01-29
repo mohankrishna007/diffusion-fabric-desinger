@@ -20,6 +20,7 @@ Consider implementing timeout handling and progress reporting.
 """
 
 from weaver.diffusion.stages.base import BaseStage, StageMetadata
+from weaver.diffusion.orchestrator.stage_registry import stage_registry
 from weaver.shared.schemas import StageInput, StageOutput, StageStatus
 
 
@@ -35,6 +36,13 @@ class Stage3Output(StageOutput):
     pass
 
 
+@stage_registry.register(
+    stage_id="diffusion_refinement",
+    display_name="Controlled Diffusion Refinement",
+    description="Apply geometry-aware AI refinement while preserving structural invariants",
+    dependencies=["structural_intent"],
+    version="1.0.0"
+)
 class Stage3DiffusionRefinement(BaseStage[Stage3Input, Stage3Output]):
     """
     Stage 3: Controlled Diffusion Refinement
@@ -48,7 +56,8 @@ class Stage3DiffusionRefinement(BaseStage[Stage3Input, Stage3Output]):
     @property
     def metadata(self) -> StageMetadata:
         return StageMetadata(
-            stage_number=3,
+            stage_id="diffusion_refinement",
+            stage_number=None,
             name="Controlled Diffusion Refinement",
             description="Smoothing and refining geometry via AI",
             version="1.0.0",
@@ -71,7 +80,8 @@ class Stage3DiffusionRefinement(BaseStage[Stage3Input, Stage3Output]):
         # This will be the most complex stage requiring AI model integration
         
         return Stage3Output(
-            stage_number=3,
+            stage_id=input_data.stage_id,
+            stage_number=input_data.stage_number,
             status=StageStatus.COMPLETED,
             message="Stage 3 execution placeholder - awaiting implementation",
             data={},

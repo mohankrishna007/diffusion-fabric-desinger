@@ -21,6 +21,7 @@ This is the FINAL FIREWALL - zero tolerance for violations.
 """
 
 from weaver.diffusion.stages.base import BaseStage, StageMetadata
+from weaver.diffusion.orchestrator.stage_registry import stage_registry
 from weaver.shared.schemas import StageInput, StageOutput, StageStatus
 
 
@@ -39,6 +40,13 @@ class Stage7Output(StageOutput):
     pass
 
 
+@stage_registry.register(
+    stage_id="precam_validation",
+    display_name="Pre-CAM Validation",
+    description="Final validation before CAM export with zero-tolerance checks",
+    dependencies=["color_constraint"],
+    version="1.0.0"
+)
 class Stage7PreCAMValidation(BaseStage[Stage7Input, Stage7Output]):
     """
     Stage 7: Pre-CAM Validation Firewall
@@ -53,7 +61,8 @@ class Stage7PreCAMValidation(BaseStage[Stage7Input, Stage7Output]):
     @property
     def metadata(self) -> StageMetadata:
         return StageMetadata(
-            stage_number=7,
+            stage_id="precam_validation",
+            stage_number=None,
             name="Pre-CAM Validation Firewall",
             description="Final hardware-compliance audit",
             version="1.0.0",
@@ -75,7 +84,8 @@ class Stage7PreCAMValidation(BaseStage[Stage7Input, Stage7Output]):
         # TODO: Implement stage logic
         
         return Stage7Output(
-            stage_number=7,
+            stage_id=input_data.stage_id,
+            stage_number=input_data.stage_number,
             status=StageStatus.COMPLETED,
             message="Stage 7 execution placeholder - awaiting implementation",
             data={},

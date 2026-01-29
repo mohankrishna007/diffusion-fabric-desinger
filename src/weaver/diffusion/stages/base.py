@@ -5,7 +5,7 @@ All pipeline stages must inherit from BaseStage and implement the execute method
 
 from abc import ABC, abstractmethod
 from pydantic import BaseModel, Field
-from typing import TypeVar, Generic
+from typing import TypeVar, Generic, Optional
 from weaver.shared.schemas import StageInput, StageOutput
 
 
@@ -16,7 +16,8 @@ TOutput = TypeVar('TOutput', bound=StageOutput)
 
 class StageMetadata(BaseModel):
     """Metadata describing a stage."""
-    stage_number: int = Field(..., ge=0, le=7, description="Stage number (0-7)")
+    stage_id: str = Field(..., description="Unique stage identifier (e.g., 'input_acquisition')")
+    stage_number: Optional[int] = Field(default=None, description="Stage execution order (optional, set by orchestrator)")
     name: str = Field(..., description="Stage name")
     description: str = Field(..., description="Stage description")
     version: str = Field(default="1.0.0", description="Stage implementation version")
