@@ -47,7 +47,7 @@ class Stage7Output(StageOutput):
     dependencies=["color_constraint"],
     version="1.0.0"
 )
-class Stage7PreCAMValidation(BaseStage[Stage7Input, Stage7Output]):
+class PreCAMValidationStage(BaseStage[Stage7Input, Stage7Output]):
     """
     Stage 7: Pre-CAM Validation Firewall
     

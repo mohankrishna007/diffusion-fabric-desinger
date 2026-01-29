@@ -43,7 +43,7 @@ class Stage3Output(StageOutput):
     dependencies=["structural_intent"],
     version="1.0.0"
 )
-class Stage3DiffusionRefinement(BaseStage[Stage3Input, Stage3Output]):
+class DiffusionRefinementStage(BaseStage[Stage3Input, Stage3Output]):
     """
     Stage 3: Controlled Diffusion Refinement
     

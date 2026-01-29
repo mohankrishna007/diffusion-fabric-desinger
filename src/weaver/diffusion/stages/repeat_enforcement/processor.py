@@ -40,7 +40,7 @@ class Stage4Output(StageOutput):
     dependencies=["diffusion_refinement"],
     version="1.0.0"
 )
-class Stage4RepeatEnforcement(BaseStage[Stage4Input, Stage4Output]):
+class RepeatEnforcementStage(BaseStage[Stage4Input, Stage4Output]):
     """
     Stage 4: Repeat & Boundary Enforcement
     

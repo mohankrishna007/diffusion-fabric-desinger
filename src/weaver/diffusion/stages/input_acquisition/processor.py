@@ -44,30 +44,30 @@ from weaver.shared.constants import MIN_DPI, MAX_DPI
 from weaver.shared.logger import get_logger
 
 # Import sub-module validators
-from weaver.diffusion.stages.stage_0_input_acquisition.pre_decode_guard import (
+from weaver.diffusion.stages.input_acquisition.pre_decode_guard import (
     validate_pre_decode_resources
 )
-from weaver.diffusion.stages.stage_0_input_acquisition.image_decoder import (
+from weaver.diffusion.stages.input_acquisition.image_decoder import (
     decode_image,
     validate_image_decoded
 )
-from weaver.diffusion.stages.stage_0_input_acquisition.format_validator import (
+from weaver.diffusion.stages.input_acquisition.format_validator import (
     validate_format_allowlist
 )
-from weaver.diffusion.stages.stage_0_input_acquisition.metadata_validator import (
+from weaver.diffusion.stages.input_acquisition.metadata_validator import (
     validate_metadata_consistency
 )
-from weaver.diffusion.stages.stage_0_input_acquisition.dimension_validator import (
+from weaver.diffusion.stages.input_acquisition.dimension_validator import (
     validate_dimensions
 )
-from weaver.diffusion.stages.stage_0_input_acquisition.repeat_validator import (
+from weaver.diffusion.stages.input_acquisition.repeat_validator import (
     validate_repeat_integrity,
     calculate_tile_counts
 )
-from weaver.diffusion.stages.stage_0_input_acquisition.resource_guard import (
+from weaver.diffusion.stages.input_acquisition.resource_guard import (
     validate_resource_limits
 )
-from weaver.diffusion.stages.stage_0_input_acquisition.source_sealer import (
+from weaver.diffusion.stages.input_acquisition.source_sealer import (
     compute_image_hash,
     create_source_seal
 )
@@ -219,7 +219,7 @@ class Stage0Output(StageOutput):
     dependencies=[],
     version="2.0.0"
 )
-class Stage0InputAcquisition(BaseStage[Stage0Input, Stage0Output]):
+class InputAcquisitionStage(BaseStage[Stage0Input, Stage0Output]):
     """
     Stage 0: Input Acquisition - v2.0.0 Modularized
     

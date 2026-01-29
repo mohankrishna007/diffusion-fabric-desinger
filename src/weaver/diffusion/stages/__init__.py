@@ -18,50 +18,50 @@ ALL_STAGES = []
 
 # Import each stage individually to allow partial registration on import errors
 try:
-    from weaver.diffusion.stages.stage_0_input_acquisition.processor import Stage0InputAcquisition
-    ALL_STAGES.append(Stage0InputAcquisition)
+    from weaver.diffusion.stages.input_acquisition.processor import InputAcquisitionStage
+    ALL_STAGES.append(InputAcquisitionStage)
 except ImportError as e:
     warnings.warn(f"Could not import Stage 0: {e}")
 
 try:
-    from weaver.diffusion.stages.stage_1_canonical_normalization.processor import Stage1CanonicalNormalization
-    ALL_STAGES.append(Stage1CanonicalNormalization)
+    from weaver.diffusion.stages.canonical_normalization.processor import CanonicalNormalizationStage
+    ALL_STAGES.append(CanonicalNormalizationStage)
 except ImportError as e:
     warnings.warn(f"Could not import Stage 1: {e}")
 
 try:
-    from weaver.diffusion.stages.stage_2_structural_intent.processor import Stage2StructuralIntent
-    ALL_STAGES.append(Stage2StructuralIntent)
+    from weaver.diffusion.stages.structural_intent.processor import StructuralIntentStage
+    ALL_STAGES.append(StructuralIntentStage)
 except ImportError as e:
     warnings.warn(f"Could not import Stage 2: {e}")
 
 try:
-    from weaver.diffusion.stages.stage_3_diffusion_refinement.processor import Stage3DiffusionRefinement
-    ALL_STAGES.append(Stage3DiffusionRefinement)
+    from weaver.diffusion.stages.diffusion_refinement.processor import DiffusionRefinementStage
+    ALL_STAGES.append(DiffusionRefinementStage)
 except ImportError as e:
     warnings.warn(f"Could not import Stage 3: {e}")
 
 try:
-    from weaver.diffusion.stages.stage_4_repeat_enforcement.processor import Stage4RepeatEnforcement
-    ALL_STAGES.append(Stage4RepeatEnforcement)
+    from weaver.diffusion.stages.repeat_enforcement.processor import RepeatEnforcementStage
+    ALL_STAGES.append(RepeatEnforcementStage)
 except ImportError as e:
     warnings.warn(f"Could not import Stage 4: {e}")
 
 try:
-    from weaver.diffusion.stages.stage_5_geometry_cleanup.processor import Stage5GeometryCleanup
-    ALL_STAGES.append(Stage5GeometryCleanup)
+    from weaver.diffusion.stages.geometry_cleanup.processor import GeometryCleanupStage
+    ALL_STAGES.append(GeometryCleanupStage)
 except ImportError as e:
     warnings.warn(f"Could not import Stage 5: {e}")
 
 try:
-    from weaver.diffusion.stages.stage_6_color_constraint.processor import Stage6ColorConstraint
-    ALL_STAGES.append(Stage6ColorConstraint)
+    from weaver.diffusion.stages.color_constraint.processor import ColorConstraintStage
+    ALL_STAGES.append(ColorConstraintStage)
 except ImportError as e:
     warnings.warn(f"Could not import Stage 6: {e}")
 
 try:
-    from weaver.diffusion.stages.stage_7_precam_validation.processor import Stage7PreCAMValidation
-    ALL_STAGES.append(Stage7PreCAMValidation)
+    from weaver.diffusion.stages.precam_validation.processor import PreCAMValidationStage
+    ALL_STAGES.append(PreCAMValidationStage)
 except ImportError as e:
     warnings.warn(f"Could not import Stage 7: {e}")
 

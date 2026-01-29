@@ -40,7 +40,7 @@ class Stage6Output(StageOutput):
     dependencies=["geometry_cleanup"],
     version="1.0.0"
 )
-class Stage6ColorConstraint(BaseStage[Stage6Input, Stage6Output]):
+class ColorConstraintStage(BaseStage[Stage6Input, Stage6Output]):
     """
     Stage 6: Color & Thread Constraint Enforcement
     

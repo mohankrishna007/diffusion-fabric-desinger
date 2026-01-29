@@ -40,7 +40,7 @@ class Stage5Output(StageOutput):
     dependencies=["repeat_enforcement"],
     version="1.0.0"
 )
-class Stage5GeometryCleanup(BaseStage[Stage5Input, Stage5Output]):
+class GeometryCleanupStage(BaseStage[Stage5Input, Stage5Output]):
     """
     Stage 5: Manufacturing Geometry Cleanup
     

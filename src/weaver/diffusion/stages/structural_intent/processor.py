@@ -136,7 +136,7 @@ class Stage2Output(StageOutput):
     dependencies=["canonical_normalization"],
     version="1.0.0"
 )
-class Stage2StructuralIntent(BaseStage[Stage2Input, Stage2Output]):
+class StructuralIntentStage(BaseStage[Stage2Input, Stage2Output]):
     """
     Stage 2: Structural Intent Definition
     

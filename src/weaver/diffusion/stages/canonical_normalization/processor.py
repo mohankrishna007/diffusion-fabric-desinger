@@ -117,7 +117,7 @@ class Stage1Output(StageOutput):
     dependencies=["input_acquisition"],
     version="1.0.0"
 )
-class Stage1CanonicalNormalization(BaseStage[Stage1Input, Stage1Output]):
+class CanonicalNormalizationStage(BaseStage[Stage1Input, Stage1Output]):
     """
     Stage 1: Canonical Normalization
     

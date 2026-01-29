@@ -5,15 +5,16 @@ Converts validated but representation-ambiguous images into a single
 deterministic canonical raster (RGB, 8-bit, EXIF-normalized, repeat-aligned).
 """
 
-from weaver.diffusion.stages.stage_1_canonical_normalization.processor import (
-    Stage1CanonicalNormalization,
+from weaver.diffusion.stages.canonical_normalization.processor import (
+    CanonicalNormalizationStage,
     Stage1Input,
     Stage1Output,
 )
 
 __all__ = [
-    "Stage1CanonicalNormalization",
+    "CanonicalNormalizationStage",
     "Stage1Input",
     "Stage1Output",
 ]
+
 
