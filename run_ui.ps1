@@ -9,7 +9,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = $scriptDir
 
 # Path to streamlit app
-$appPath = Join-Path $projectRoot "src\weaver\ui\streamlit_app.py"
+$appPath = Join-Path $projectRoot "src\ui\streamlit_app.py"
 
 # Check if app file exists
 if (-not (Test-Path $appPath)) {

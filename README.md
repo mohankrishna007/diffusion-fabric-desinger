@@ -58,7 +58,7 @@ cd diffusion-fabric-designer
 uv sync  # Creates venv + installs everything
 
 # 3. Run the API
-uv run python -m weaver.api.main
+uv run python -m api.main
 ```
 
 **📖 API Documentation:** http://localhost:8000/docs
@@ -84,7 +84,7 @@ chmod +x run_ui.sh
 
 **Manual Launch:**
 ```bash
-streamlit run src/weaver/ui/streamlit_app.py
+streamlit run src/ui/streamlit_app.py
 ```
 
 ### Features
@@ -183,65 +183,164 @@ curl "http://localhost:8000/api/v1/pipeline/stages"
 ### Architecture Overview
 
 ```
-┌────────────────────────────────────────┐
-│         FastAPI REST API               │
-│  POST /execute  GET /status/{id}       │
-└──────────────┬─────────────────────────┘
-               │
-┌──────────────▼─────────────────────────┐
-│      Pipeline Orchestrator             │
-│  • Loads stages dynamically            │
-│  • Validates contracts                 │
-│  • Sequential execution                │
-└──────────────┬─────────────────────────┘
-               │
-    ┌──────────┴──────────┐
-    │                     │
-┌───▼───────┐           ┌────▼───────┐
-│Stage 0    │    ...    │Stage 7     │
-└───────────┘           └────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    Multiple Interfaces                           │
+│                                                                  │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │  FastAPI    │  │  Streamlit   │  │  Python Package      │  │
+│  │  REST API   │  │  Web UI      │  │  Direct Usage        │  │
+│  └──────┬──────┘  └──────┬───────┘  └──────────┬───────────┘  │
+│         │                │                      │               │
+│         └────────────────┴──────────────────────┘               │
+│                          │                                      │
+└──────────────────────────┼──────────────────────────────────────┘
+                           ▼
+         ┌─────────────────────────────────────────┐
+         │     Unified Service Layer               │
+         │                                         │
+         │  ┌───────────────────────────────────┐ │
+         │  │ DiffusionPipelineService          │ │
+         │  │ (8-stage fabric pipeline)         │ │
+         │  └───────────────────────────────────┘ │
+         │                                         │
+         │  Future Services:                       │
+         │  • DenoiseService                       │
+         │  • PreprocessService                    │
+         │  • ValidationService                    │
+         └────────────────┬────────────────────────┘
+                          │
+         ┌────────────────▼────────────────────────┐
+         │      Pipeline Engine Core               │
+         │  • Loads stages dynamically             │
+         │  • Validates contracts                  │
+         │  • Sequential execution                 │
+         └────────────────┬────────────────────────┘
+                          │
+               ┌──────────┴──────────┐
+               │                     │
+         ┌─────▼──────┐           ┌──▼─────────┐
+         │Stage 0     │    ...    │Stage 7     │
+         └────────────┘           └────────────┘
 ```
+
+**Key Benefits:**
+- ✨ **Single Interface** - Same API for REST, UI, and direct usage
+- 🔧 **Easy Integration** - Use as Python package, REST API, or web UI
+- 📦 **Modular Services** - Add new services (denoise, preprocess) independently
+- 🧪 **Testable** - Service layer can be tested independently
+- 📝 **Consistent** - Same error handling and validation everywhere
+
+### Usage Options
+
+**1. As a Python Package:**
+```python
+from weaver import DiffusionPipelineService
+# or: from weaver.diffusion import DiffusionPipelineService
+
+service = DiffusionPipelineService()
+result = service.execute_pipeline(
+    image_path="design.png",
+    config={"dpi": 360, "color_mode": "RGBA", ...}
+)
+```
+
+**2. Via REST API:**
+```bash
+curl -X POST "http://localhost:8000/api/v1/pipeline/execute/sync" \
+  -H "Content-Type: application/json" \
+  -d '{"source_file": "design.png", "config": {...}}'
+```
+
+**3. Streamlit Web UI:**
+```bash
+./run_ui.ps1  # Windows
+./run_ui.sh   # Linux/Mac
+``` \
+  -d '{"source_file": "design.png", "config": {...}}'
+```
+📚 **API Docs:** http://localhost:8000/docs
+
+**3. Streamlit Web UI:**
+```bash
+./run_ui.ps1  # Windows
+./run_ui.sh   # Linux/Mac
+```
+🎨 **UI automatically detects Stage 0 configs** (DPI, color mode, repeat units)
+
+---
+
+## 👨‍💻 For Developers
 
 ### Project Structure
 
 ```
 diffusion-fabric-designer/
-├── src/weaver/
-│   ├── api/                       # 🌐 REST API Layer
-│   │   ├── main.py               # FastAPI app
-│   │   └── routes/               # API endpoints
-│   ├── ui/                       # 🎨 Streamlit UI (NEW!)
-│   │   ├── streamlit_app.py     # Main UI app
-│   │   ├── config_detector.py   # Auto-detect Stage 0 configs
-│   │   └── pipeline_service.py  # Pipeline integration
-│   ├── orchestrator/             # 🎭 Pipeline Engine
-│   │   ├── pipeline_engine.py    # Sequential executor
-│   │   └── stage_loader.py       # Dynamic stage loading
-│   ├── stages/                   # 🔧 Processing Stages
-│   │   ├── base.py              # BaseStage contract
-│   │   ├── stage_0_input_acquisition/
-│   │   ├── stage_1_canonical_normalization/
-│   │   ├── stage_2_structural_intent/
-│   │   ├── stage_3_diffusion_refinement/
-│   │   ├── stage_4_repeat_enforcement/
-│   │   ├── stage_5_geometry_cleanup/
-│   │   ├── stage_6_color_constraint/
-│   │   └── stage_7_precam_validation/
-│   └── shared/                   # 📦 Shared Utilities
-│       ├── schemas.py           # Pydantic models
-│       ├── exceptions.py        # Error hierarchy
-│       ├── logger.py            # Structured logging
-│       └── utils.py             # Helper functions
+├── src/
+│   ├── weaver/                # 📦 Main Package (Pure Library)
+│   │   ├── __init__.py       # Package exports
+│   │   ├── diffusion/        # Diffusion pipeline sub-package
+│   │   │   ├── __init__.py
+│   │   │   ├── service.py    # DiffusionPipelineService
+│   │   │   ├── orchestrator/ # Pipeline execution engine
+│   │   │   │   ├── pipeline_engine.py
+│   │   │   │   └── stage_loader.py
+│   │   │   └── stages/       # 8 processing stages
+│   │   │       ├── base.py
+│   │   │       ├── stage_0_input_acquisition/
+│   │   │       ├── stage_1_canonical_normalization/
+│   │   │       ├── stage_2_structural_intent/
+│   │   │       ├── stage_3_diffusion_refinement/
+│   │   │       ├── stage_4_repeat_enforcement/
+│   │   │       ├── stage_5_geometry_cleanup/
+│   │   │       ├── stage_6_color_constraint/
+│   │   │       └── stage_7_precam_validation/
+│   │   ├── preprocessing/    # 🔮 Future: Preprocessing sub-package
+│   │   ├── denoise/          # 🔮 Future: Denoise sub-package
+│   │   └── shared/           # Shared utilities across all sub-packages
+│   │       ├── schemas.py
+│   │       ├── exceptions.py
+│   │       ├── logger.py
+│   │       └── utils.py
+│   ├── api/                  # 🌐 REST API Application (Uses weaver)
+│   │   ├── main.py
+│   │   └── routes/
+│   │       ├── pipeline.py   # Uses weaver.diffusion
+│   │       └── health.py
+│   └── ui/                   # 🎨 Streamlit UI Application (Uses weaver)
+│       ├── streamlit_app.py  # Uses weaver.diffusion
+│       ├── config_detector.py
+│       └── pipeline_service.py
 ├── config/
-│   └── pipeline.yaml            # ⚙️ Manufacturing constraints
-├── tests/                       # 🧪 Test suite
-├── docs/
-│   ├── UI_GUIDE.md              # 📘 Streamlit UI documentation
-│   └── DEVELOPER_GUIDE.md       # 📖 Stage implementation guide
-├── pyproject.toml               # 📦 Dependencies & metadata
-├── run_ui.ps1 / run_ui.sh       # 🚀 Launch Streamlit UI
-└── setup.ps1 / setup.sh         # 🚀 Quick setup scripts
+│   └── pipeline.yaml         # Configuration
+├── tests/                    # Test suite
+├── docs/                     # Documentation
+├── pyproject.toml            # Package definition
+└── run_ui.ps1 / run_ui.sh    # Launch scripts
 ```
+
+**Architecture Principles:**
+
+1. **`weaver` = Pure Package** 
+   - Self-contained library with no external dependencies on api/ui
+   - Can be installed and used independently: `pip install weaver`
+   - Multiple sub-packages: `weaver.diffusion`, `weaver.preprocessing`, etc.
+
+2. **`api` = Standalone Application**
+   - FastAPI application that imports and uses `weaver`
+   - Can be deployed independently as a REST service
+   - Uses: `from weaver.diffusion import DiffusionPipelineService`
+
+3. **`ui` = Standalone Application**
+   - Streamlit application that imports and uses `weaver`
+   - Can be deployed independently as a web UI
+   - Uses: `from weaver.diffusion import DiffusionPipelineService`
+
+4. **Benefits:**
+   - 🎯 **Clean Separation**: Library vs Applications
+   - 📦 **Independently Deployable**: Package weaver separately from API/UI
+   - 🔌 **Extensible**: Add new sub-packages to weaver (preprocessing, denoise)
+   - 🧪 **Testable**: Test weaver package without API/UI dependencies
+   - 🔄 **Reusable**: Multiple applications can use the same weaver package
 
 ---
 

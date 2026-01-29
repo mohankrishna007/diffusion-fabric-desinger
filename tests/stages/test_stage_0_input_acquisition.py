@@ -22,7 +22,7 @@ from typing import Generator
 import pytest
 from PIL import Image
 
-from weaver.stages.stage_0_input_acquisition.processor import (
+from weaver.diffusion.stages.stage_0_input_acquisition.processor import (
     Stage0InputAcquisition,
     Stage0Input,
     RepeatUnit,

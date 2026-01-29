@@ -9,7 +9,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$SCRIPT_DIR"
 
 # Path to streamlit app
-APP_PATH="$PROJECT_ROOT/src/weaver/ui/streamlit_app.py"
+APP_PATH="$PROJECT_ROOT/src/ui/streamlit_app.py"
 
 # Check if app file exists
 if [ ! -f "$APP_PATH" ]; then

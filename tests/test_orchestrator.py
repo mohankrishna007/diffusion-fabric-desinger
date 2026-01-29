@@ -3,8 +3,8 @@ Tests for the pipeline orchestrator.
 """
 
 import pytest
-from weaver.orchestrator.pipeline_engine import PipelineEngine
-from weaver.orchestrator.stage_loader import StageLoader
+from weaver.diffusion.orchestrator.pipeline_engine import PipelineEngine
+from weaver.diffusion.orchestrator.stage_loader import StageLoader
 from weaver.shared.exceptions import StageNotFoundError
 
 

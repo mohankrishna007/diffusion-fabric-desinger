@@ -23,7 +23,7 @@ import cv2
 import numpy as np
 import pytest
 
-from weaver.stages.stage_2_structural_intent.processor import (
+from weaver.diffusion.stages.stage_2_structural_intent.processor import (
     Stage2StructuralIntent,
     Stage2Input,
 )

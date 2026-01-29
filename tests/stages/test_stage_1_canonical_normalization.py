@@ -20,24 +20,24 @@ from pathlib import Path
 import tempfile
 import shutil
 
-from weaver.stages.stage_1_canonical_normalization.processor import (
+from weaver.diffusion.stages.stage_1_canonical_normalization.processor import (
     Stage1CanonicalNormalization,
     Stage1Input,
     Stage1Output,
 )
-from weaver.stages.stage_1_canonical_normalization.orientation_normalizer import (
+from weaver.diffusion.stages.stage_1_canonical_normalization.orientation_normalizer import (
     normalize_orientation,
 )
-from weaver.stages.stage_1_canonical_normalization.colorspace_normalizer import (
+from weaver.diffusion.stages.stage_1_canonical_normalization.colorspace_normalizer import (
     normalize_color_space,
 )
-from weaver.stages.stage_1_canonical_normalization.dpi_canonicalizer import (
+from weaver.diffusion.stages.stage_1_canonical_normalization.dpi_canonicalizer import (
     canonicalize_dpi,
 )
-from weaver.stages.stage_1_canonical_normalization.grid_normalizer import (
+from weaver.diffusion.stages.stage_1_canonical_normalization.grid_normalizer import (
     validate_repeat_grid,
 )
-from weaver.stages.stage_1_canonical_normalization.raster_emitter import (
+from weaver.diffusion.stages.stage_1_canonical_normalization.raster_emitter import (
     emit_canonical_raster,
     load_canonical_raster,
 )
@@ -427,7 +427,7 @@ class TestInvariantValidation:
             repeat_unit_px={"width": 300, "height": 300}
         )
         
-        from weaver.stages.stage_1_canonical_normalization.raster_emitter import validate_canonical_raster
+        from weaver.diffusion.stages.stage_1_canonical_normalization.raster_emitter import validate_canonical_raster
         with pytest.raises(CanonicalizationError) as exc_info:
             validate_canonical_raster(raster)
         assert "color mode" in str(exc_info.value).lower()
@@ -446,7 +446,7 @@ class TestInvariantValidation:
             repeat_unit_px={"width": 300, "height": 300}
         )
         
-        from weaver.stages.stage_1_canonical_normalization.raster_emitter import validate_canonical_raster
+        from weaver.diffusion.stages.stage_1_canonical_normalization.raster_emitter import validate_canonical_raster
         with pytest.raises(CanonicalizationError) as exc_info:
             validate_canonical_raster(raster)
         assert "bit depth" in str(exc_info.value).lower()
