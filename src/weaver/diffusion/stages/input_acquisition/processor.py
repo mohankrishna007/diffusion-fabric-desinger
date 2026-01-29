@@ -36,9 +36,9 @@ from typing import Optional, Dict, Any
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
-from weaver.diffusion.stages.base import BaseStage, StageMetadata
-from weaver.diffusion.orchestrator.stage_registry import stage_registry
-from weaver.shared.schemas import StageInput, StageOutput, StageStatus
+from weaver.diffusion.stages.base_stage import BaseStage, StageMetadata
+from weaver.diffusion.stages.stage_result import InputAcquisitionResult, StageResult
+from weaver.shared.schemas import StageStatus
 from weaver.shared.exceptions import InputSchemaError
 from weaver.shared.constants import MIN_DPI, MAX_DPI
 from weaver.shared.logger import get_logger
@@ -84,142 +84,7 @@ class RepeatUnit(BaseModel):
     height: int = Field(..., gt=0, description="Repeat unit height in pixels")
 
 
-class Stage0Input(StageInput):
-    """
-    Input schema for Stage 0 - Design Package.
-    
-    STRICT CONTRACT: All fields are REQUIRED. No defaults, no inference.
-    Missing metadata = FAIL immediately.
-    """
-    
-    model_config = ConfigDict(frozen=True, extra="forbid")
-    
-    image_path: str = Field(
-        ...,
-        description="Absolute path to raw design image file"
-    )
-    dpi: int = Field(
-        ...,
-        ge=MIN_DPI,
-        le=MAX_DPI,
-        description="Declared DPI - must match image metadata if present"
-    )
-    repeat_unit_px: RepeatUnit = Field(
-        ...,
-        description="Explicit repeat unit dimensions in pixels"
-    )
-    color_mode: str = Field(
-        ...,
-        description="Declared color mode (e.g., 'RGB', 'RGBA', 'L')"
-    )
-    
-    @field_validator("image_path")
-    @classmethod
-    def validate_image_path(cls, v: str) -> str:
-        """Validate image path exists and is a file."""
-        path = Path(v)
-        if not path.exists():
-            raise InputSchemaError(
-                message=f"Image file does not exist: {v}",
-                stage_number=0,
-                details={"image_path": v, "error": "file_not_found"}
-            )
-        if not path.is_file():
-            raise InputSchemaError(
-                message=f"Image path is not a file: {v}",
-                stage_number=0,
-                details={"image_path": v, "error": "not_a_file"}
-            )
-        return v
-    
-    @field_validator("color_mode")
-    @classmethod
-    def validate_color_mode(cls, v: str) -> str:
-        """Validate color mode is unambiguous for manufacturing.
-        
-        FORBIDDEN MODES:
-        - "P" (palette-indexed): Requires palette interpretation, ambiguous for CAM
-        - "1" (1-bit): Bit-depth assumptions leak into downstream stages
-        
-        RATIONALE: Stage 0 establishes source of truth. Only unambiguous color
-        representations allowed. Convert P/1 to RGB/L before pipeline entry.
-        """
-        valid_modes = {"RGB", "RGBA", "L", "LA"}
-        if v not in valid_modes:
-            forbidden_modes = {"P": "palette-indexed (convert to RGB before pipeline entry)",
-                             "1": "1-bit (convert to L or RGB before pipeline entry)"}
-            rationale = forbidden_modes.get(v, "not a recognized mode")
-            raise InputSchemaError(
-                message=f"Color mode '{v}' not allowed: {rationale}",
-                stage_number=0,
-                details={
-                    "color_mode": v,
-                    "valid_modes": list(valid_modes),
-                    "rationale": "Stage 0 requires unambiguous color representations. Palette-indexed (P) and 1-bit (1) modes create manufacturing ambiguity."
-                }
-            )
-        return v
-
-
-class InputDescriptor(StageOutput):
-    """
-    Canonical Input Descriptor - Source of Truth.
-    
-    This descriptor represents the VALIDATED, IMMUTABLE raw design.
-    All downstream stages must trust this descriptor completely.
-    """
-    
-    model_config = ConfigDict(frozen=True, extra="forbid")
-    
-    schema_version: str = Field(
-        default="stage0.v1",
-        description="Input descriptor schema version"
-    )
-    raw_hash: str = Field(
-        ...,
-        description="SHA-256 hash of raw image bytes (immutability proof)"
-    )
-    image_path: str = Field(
-        ...,
-        description="Path to immutable raw image"
-    )
-    width_px: int = Field(..., description="Image width in pixels")
-    height_px: int = Field(..., description="Image height in pixels")
-    dpi: int = Field(..., description="Validated DPI")
-    repeat_unit_px: Dict[str, int] = Field(
-        ...,
-        description="Validated repeat unit {width, height}"
-    )
-    color_mode: str = Field(..., description="Validated color mode")
-    file_format: str = Field(..., description="Validated file format")
-    file_size_bytes: int = Field(..., description="File size in bytes")
-    bit_depth: int = Field(..., description="Bit depth per channel")
-
-
-class Stage0Output(StageOutput):
-    """
-    Output schema for Stage 0.
-    
-    PASS: Contains input_descriptor
-    FAIL: Contains error details, no input_descriptor
-    """
-    
-    model_config = ConfigDict(frozen=True, extra="forbid")
-    
-    input_descriptor: Optional[InputDescriptor] = Field(
-        default=None,
-        description="Canonical input descriptor (present only on PASS)"
-    )
-
-
-@stage_registry.register(
-    stage_id="input_acquisition",
-    display_name="Input Acquisition",
-    description="RAW DESIGN SOURCE OF TRUTH - Fast-fail input validation with zero tolerance for invalid inputs",
-    dependencies=[],
-    version="2.0.0"
-)
-class InputAcquisitionStage(BaseStage[Stage0Input, Stage0Output]):
+class InputAcquisitionStage(BaseStage):
     """
     Stage 0: Input Acquisition - v2.0.0 Modularized
     
@@ -250,14 +115,36 @@ class InputAcquisitionStage(BaseStage[Stage0Input, Stage0Output]):
     def metadata(self) -> StageMetadata:
         return StageMetadata(
             stage_id="input_acquisition",
-            stage_number=None,  # Set dynamically by orchestrator
             name="Input Acquisition",
             description="RAW DESIGN SOURCE OF TRUTH - Fast-fail input validation",
             version="2.0.0",
-            author="Weaver AI Manufacturing Team"
         )
+
+    def validate_input(self, prev_result: Optional[StageResult], config: dict) -> None:
+        """Validate config has required fields for stage 0."""
+        source_file = config.get('source_file')
+        if not source_file:
+            raise InputSchemaError(
+                message="Config must include 'source_file' path",
+                stage_number=0,
+                details={"config_keys": list(config.keys())}
+            )
+        
+        if not isinstance(source_file, (str, Path)):
+            raise InputSchemaError(
+                message="source_file must be a string or Path",
+                stage_number=0,
+                details={"source_file_type": type(source_file).__name__}
+            )
+        
+        if not Path(source_file).exists():
+            raise InputSchemaError(
+                message=f"Source file does not exist: {source_file}",
+                stage_number=0,
+                details={"source_file": str(source_file)}
+            )
     
-    def execute(self, input_data: Stage0Input) -> Stage0Output:
+    def _execute(self, prev_result: Optional[StageResult], pipeline_id: str, config: dict) -> InputAcquisitionResult:
         """
         Execute Stage 0: Input Acquisition (Modularized v2.0).
         
@@ -265,10 +152,12 @@ class InputAcquisitionStage(BaseStage[Stage0Input, Stage0Output]):
         Each sub-module validates one aspect. Any failure raises exception immediately.
         
         Args:
-            input_data: Design package with image path and explicit metadata
+            prev_result: None (first stage)
+            pipeline_id: Pipeline execution ID
+            config: Pipeline configuration with source_file and metadata
         
         Returns:
-            Stage0Output with PASS status and input_descriptor
+            InputAcquisitionResult with validated input descriptor
         
         Raises:
             InputFormatError: File format not on lossless allowlist
@@ -277,121 +166,110 @@ class InputAcquisitionStage(BaseStage[Stage0Input, Stage0Output]):
             RepeatIntegrityError: Non-integer tiling detected
             ResourceProtectionError: File size or pixel count exceeds limits
         """
-        logger.info(f"Starting Stage 0 execution (v2.0): {input_data.pipeline_id}")
+        # Extract input parameters from config (already validated)
+        image_path: str = str(config['source_file'])  # Required by validate_input
+        dpi: int = config.get('dpi', 300)
+        repeat_unit: dict = config.get('repeat_unit', {'width': 100, 'height': 100})
+        color_mode: str = config.get('color_mode', 'RGB')
         
-        # STEP 1: Schema validation (already done by Pydantic)
-        logger.debug("Schema validation passed (Pydantic)")
+        logger.info(f"Starting Stage 0 execution (v2.0): {pipeline_id}")
         
-        # STEP 2: Pre-decode resource check (OOM protection)
-        logger.info("Step 2/8: Pre-decode resource guard")
-        pre_decode_result = validate_pre_decode_resources(input_data.image_path)
+        # Extract repeat dimensions
+        repeat_width = repeat_unit.get('width', 100)
+        repeat_height = repeat_unit.get('height', 100)
+        image_width = 0  # Will be set after decode
+        image_height = 0
         
-        # STEP 3: Decode image using lossless decoder
-        logger.info("Step 3/8: Image decoder")
-        image, image_info = decode_image(input_data.image_path)
+        # STEP 1: Pre-decode resource check
+        logger.info("Step 1/8: Pre-decode resource guard")
+        pre_decode_result = validate_pre_decode_resources(image_path)
+        
+        # STEP 2: Decode image
+        logger.info("Step 2/8: Image decoder")
+        image, image_info = decode_image(image_path)
         validate_image_decoded(image, image_info)
         
-        # STEP 4: Enforce format allowlist (LOSSLESS ONLY)
-        logger.info("Step 4/8: Format validator")
+        image_width = image_info["width"]
+        image_height = image_info["height"]
+        
+        # STEP 3: Enforce format allowlist
+        logger.info("Step 3/8: Format validator")
         format_result = validate_format_allowlist(
-            input_data.image_path,
+            image_path,
             image_info["format"]
         )
         
-        # STEP 5: Metadata consistency validation
-        logger.info("Step 5/8: Metadata validator")
+        # STEP 4: Metadata consistency validation
+        logger.info("Step 4/8: Metadata validator")
         metadata_result = validate_metadata_consistency(
-            declared_dpi=input_data.dpi,
-            declared_color_mode=input_data.color_mode,
+            declared_dpi=dpi,
+            declared_color_mode=color_mode,
             image=image,
             image_info=image_info
         )
         
-        # STEP 6: Dimensional sanity checks
-        logger.info("Step 6/8: Dimension validator")
-        dimension_result = validate_dimensions(
-            image_info["width"],
-            image_info["height"]
-        )
+        # STEP 5: Dimensional sanity checks
+        logger.info("Step 5/8: Dimension validator")
+        dimension_result = validate_dimensions(image_width, image_height)
         
-        # STEP 7: Repeat integrity check (perfect tiling)
-        logger.info("Step 7/8: Repeat validator")
+        # STEP 6: Repeat integrity check
+        logger.info("Step 6/8: Repeat validator")
         repeat_result = validate_repeat_integrity(
-            image_width=image_info["width"],
-            image_height=image_info["height"],
-            repeat_width=input_data.repeat_unit_px.width,
-            repeat_height=input_data.repeat_unit_px.height
+            image_width=image_width,
+            image_height=image_height,
+            repeat_width=repeat_width,
+            repeat_height=repeat_height
         )
         
-        # STEP 8: Resource protection (post-decode)
-        logger.info("Step 8/8: Resource guard")
+        # STEP 7: Resource protection
+        logger.info("Step 7/8: Resource guard")
         resource_result = validate_resource_limits(
-            input_data.image_path,
-            image_info["width"],
-            image_info["height"]
+            image_path,
+            image_width,
+            image_height
         )
         
-        # STEP 9: Source-of-truth sealing (hash computation)
-        logger.info("Computing source seal (SHA-256 hash)")
-        source_seal = create_source_seal(input_data.image_path)
+        # STEP 8: Source sealing
+        logger.info("Step 8/8: Computing source seal")
+        source_seal = create_source_seal(image_path)
         raw_hash = source_seal["raw_hash"]
         
-        # STEP 10: Emit canonical Input Descriptor
-        logger.info("Creating canonical Input Descriptor")
-        input_descriptor = InputDescriptor(
-            stage_id=input_data.stage_id,
-            stage_number=input_data.stage_number,
-            status=StageStatus.COMPLETED,
-            message="Input validated and sealed as source of truth",
-            schema_version="stage0.v1",
-            raw_hash=raw_hash,
-            image_path=str(Path(input_data.image_path).resolve()),
-            width_px=image_info["width"],
-            height_px=image_info["height"],
-            dpi=input_data.dpi,
-            repeat_unit_px={
-                "width": input_data.repeat_unit_px.width,
-                "height": input_data.repeat_unit_px.height
-            },
-            color_mode=image_info["mode"],
-            file_format=image_info["format"],
-            file_size_bytes=image_info["file_size"],
-            bit_depth=image_info["bit_depth"],
-            data={},
-            metrics={
-                "validation_steps_passed": 10,
-                "pixel_count": image_info["width"] * image_info["height"],
-                "repeat_units_x": repeat_result["tiles_x"],
-                "repeat_units_y": repeat_result["tiles_y"],
-                "total_repeat_units": repeat_result["total_tiles"],
-            }
-        )
+        # Extract commonly used values for logging and metrics
+        logger.info("Creating stage result")
+        resolved_path = str(Path(image_path).resolve())
+        pixel_count = image_width * image_height
+        tiles_x = repeat_result["tiles_x"]
+        tiles_y = repeat_result["tiles_y"]
+        total_tiles = repeat_result["total_tiles"]
+        size_str = f"{image_width}x{image_height}"
+        tiles_str = f"{tiles_x}x{tiles_y}"
         
         logger.info(
-            f"Stage 0 completed successfully: {input_data.pipeline_id} - "
-            f"{image_info['width']}x{image_info['height']} @ {input_data.dpi}DPI, "
-            f"{repeat_result['tiles_x']}x{repeat_result['tiles_y']} tiles"
+            f"Stage 0 completed successfully: {pipeline_id} - "
+            f"{size_str} @ {dpi}DPI, {tiles_str} tiles"
         )
         
-        # STEP 11: Save stage artifacts
-        from weaver.shared.utils import get_stage_artifact_dir, save_artifact_json
-        
-        artifact_dir = get_stage_artifact_dir(input_data.pipeline_id, 0)
-        
-        # Save input descriptor as JSON
-        input_descriptor_path = save_artifact_json(
-            artifact_dir,
-            "input_descriptor.json",
-            input_descriptor.model_dump()
-        )
-        
-        # Save complete stage 0 output metadata
+        # Build stage metadata (saved by pipeline engine)
         stage_metadata = {
             "stage_number": 0,
             "stage_name": "Input Acquisition",
             "status": "COMPLETED",
-            "pipeline_id": input_data.pipeline_id,
-            "input_descriptor": input_descriptor.model_dump(),
+            "pipeline_id": pipeline_id,
+            "input_descriptor": {
+                "stage_id": "input_acquisition",
+                "stage_number": 0,
+                "status": "COMPLETED",
+                "message": "Input validated and sealed as source of truth",
+                "schema_version": "stage0.v1",
+                "raw_hash": raw_hash,
+                "image_path": resolved_path,
+                "width_px": image_width,
+                "height_px": image_height,
+                "dpi": dpi,
+                "repeat_unit_px": {"width": repeat_width, "height": repeat_height},
+                "color_mode": image_info["mode"],
+                "bit_depth": image_info["bit_depth"]
+            },
             "source_seal": source_seal,
             "validation_results": {
                 "pre_decode_check": pre_decode_result,
@@ -401,42 +279,28 @@ class InputAcquisitionStage(BaseStage[Stage0Input, Stage0Output]):
                 "repeat_validation": repeat_result,
                 "resource_validation": resource_result
             },
-            "metrics": input_descriptor.metrics
+            "metrics": {
+                "validation_steps_passed": 8,
+                "pixel_count": pixel_count,
+                "repeat_units_x": tiles_x,
+                "repeat_units_y": tiles_y,
+                "total_repeat_units": total_tiles,
+                "file_format": image_info["format"],
+                "file_size_bytes": image_info["file_size"]
+            }
         }
         
-        save_artifact_json(artifact_dir, "stage_metadata.json", stage_metadata)
-        
-        logger.info(f"Stage 0 artifacts saved to: {artifact_dir}")
-        
-        return Stage0Output(
-            stage_id=input_data.stage_id,
-            stage_number=input_data.stage_number,
-            status=StageStatus.COMPLETED,
-            message="Input acquisition successful - design sealed as source of truth",
-            input_descriptor=input_descriptor,
-            data={
-                "raw_hash": raw_hash,
-                "source_seal": source_seal,
-                "artifact_dir": str(artifact_dir),
-                "input_descriptor_path": str(input_descriptor_path)
-            },
-            metrics=input_descriptor.metrics
+        return InputAcquisitionResult(
+            pipeline_id=pipeline_id,
+            stage_metadata=stage_metadata,
+            raw_hash=raw_hash,
+            source_seal=source_seal,
+            image_path=resolved_path,
+            width_px=image_width,
+            height_px=image_height,
+            dpi=dpi,
+            repeat_unit_px={"width": repeat_width, "height": repeat_height},
+            color_mode=image_info["mode"],
+            bit_depth=image_info["bit_depth"]
         )
-    
-    def pre_execute(self, input_data: Stage0Input) -> None:
-        """
-        Pre-execution validation.
-        
-        Schema validation already performed by Pydantic.
-        Additional fast-fail checks could be added here.
-        """
-        super().pre_execute(input_data)
-    
-    def post_execute(self, output_data: Stage0Output) -> None:
-        """
-        Post-execution validation.
-        
-        Ensure output contains input_descriptor on PASS.
-        """
-        super().post_execute(output_data)
 

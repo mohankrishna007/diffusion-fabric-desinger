@@ -4,7 +4,7 @@ Pipeline execution endpoints.
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, status
 from typing import Dict, Any, Optional
-from weaver.diffusion import DiffusionPipelineService
+from services.diffusion_pipeline_service import DiffusionPipelineService
 from weaver.shared.schemas import (
     PipelineExecutionRequest,
     PipelineExecutionResponse,
@@ -13,7 +13,6 @@ from weaver.shared.schemas import (
     PipelineStatus
 )
 from weaver.shared.exceptions import PipelineExecutionError, WeaverError
-from weaver.shared.config_loader import load_pipeline_config
 from datetime import datetime
 import logging
 
@@ -21,23 +20,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Load pipeline configuration
-try:
-    pipeline_config = load_pipeline_config()
-    logger.info(f"Loaded pipeline config with keys: {list(pipeline_config.keys())}")
-    if 'stages' in pipeline_config:
-        logger.info(f"Config has {len(pipeline_config['stages'])} stages")
-    else:
-        logger.warning("Config loaded but has no 'stages' key")
-except Exception as e:
-    logger.error(f"Failed to load pipeline configuration: {e}", exc_info=True)
-    # Use empty config as fallback - will fail gracefully if stages not registered
-    pipeline_config = {}
-
 # Global diffusion pipeline service instance
-# Using the shared service layer for consistent interface across API, UI, and package usage
+# Service layer abstracts DiffusionPipelineEngine for REST API usage
 try:
-    pipeline_service = DiffusionPipelineService(config=pipeline_config)
+    pipeline_service = DiffusionPipelineService()
     logger.info("Pipeline service initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize pipeline service: {e}", exc_info=True)
@@ -170,8 +156,8 @@ async def execute_pipeline_sync(request: PipelineExecutionRequest):
     try:
         # Execute pipeline using shared service
         result = pipeline_service.execute_pipeline(
-            image_path=request.source_file,
-            config=request.config
+            source_file=request.source_file,
+            source_data=request.config
         )
         
         logger.info(f"Pipeline executed successfully: {result['pipeline_id']}")
@@ -273,25 +259,18 @@ async def list_stages():
         List of stage metadata
     """
     try:
-        # Access pipeline engine through service for stage metadata
-        from weaver.diffusion.orchestrator.stage_registry import stage_registry
-        
+        # Get stages from pipeline engine configuration
         stages = []
-        registrations = stage_registry.get_all_registrations()
-        execution_order = pipeline_service.pipeline_engine.get_execution_order()
+        stage_configs = pipeline_service.engine._stages
         
-        for stage_index, stage_id in enumerate(execution_order):
-            registration = registrations.get(stage_id)
-            if registration:
-                stages.append({
-                    "stage_id": stage_id,
-                    "stage_number": stage_index,
-                    "name": registration.display_name,
-                    "description": registration.description,
-                    "version": registration.version,
-                    "enabled": registration.enabled,
-                    "dependencies": registration.dependencies
-                })
+        for stage_index, stage_config in enumerate(stage_configs):
+            stages.append({
+                "stage_id": stage_config["id"],
+                "stage_number": stage_index,
+                "name": stage_config["name"],
+                "class_name": stage_config["class_name"],
+                "description": stage_config.get("config", {}).get("description", "")
+            })
         return stages
     
     except Exception as e:
@@ -316,8 +295,8 @@ def _execute_pipeline_background(
     try:
         logger.info(f"Starting background pipeline execution for {source_file}")
         result = pipeline_service.execute_pipeline(
-            image_path=source_file,
-            config=config
+            source_file=source_file,
+            source_data=config
         )
         logger.info(f"Background pipeline execution completed: {result['pipeline_id']}")
     

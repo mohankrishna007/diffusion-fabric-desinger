@@ -3,44 +3,26 @@ Stage 5: Manufacturing Geometry Cleanup
 Responsibility: Translating digital pixels into "weaveable" geometry.
 
 TODO for Developer:
-1. Implement the execute() method to:
-   - Apply minimum line width requirements
+1. Implement _execute() method to:
+   - Apply minimum line width requirements (from global manufacturing config)
    - Remove isolated "island" pixels
-   - Ensure features are thread-safe
-   - Apply morphological operations (dilate, erode, etc.)
+   - Fill holes in features
+   - Apply morphological operations (dilate, erode, opening, closing)
    - Validate against loom resolution
-
-2. Extend Stage5Input schema
-3. Extend Stage5Output schema with cleaned geometry
-4. Load manufacturing constraints from config
+   - Ensure all features are thread-safe
+   - Simplify geometry if enabled
+2. Implement morphology operations using OpenCV or scipy
+3. Add island detection and removal algorithm
+4. Build stage_metadata dict with cleanup metrics
 5. Add unit tests in tests/stages/test_stage_5.py
 """
 
-from weaver.diffusion.stages.base import BaseStage, StageMetadata
-from weaver.diffusion.orchestrator.stage_registry import stage_registry
-from weaver.shared.schemas import StageInput, StageOutput, StageStatus
+from typing import Optional
+from weaver.diffusion.stages.base_stage import BaseStage, StageMetadata
+from weaver.diffusion.stages.stage_result import StageResult, GeometryCleanupResult
 
 
-class Stage5Input(StageInput):
-    """Input schema for Stage 5."""
-    # TODO: Add tiled raster from Stage 4
-    pass
-
-
-class Stage5Output(StageOutput):
-    """Output schema for Stage 5."""
-    # TODO: Add cleaned geometry fields
-    pass
-
-
-@stage_registry.register(
-    stage_id="geometry_cleanup",
-    display_name="Geometry Cleanup",
-    description="Clean and optimize geometry for manufacturing constraints",
-    dependencies=["repeat_enforcement"],
-    version="1.0.0"
-)
-class GeometryCleanupStage(BaseStage[Stage5Input, Stage5Output]):
+class GeometryCleanupStage(BaseStage):
     """
     Stage 5: Manufacturing Geometry Cleanup
     
@@ -54,33 +36,61 @@ class GeometryCleanupStage(BaseStage[Stage5Input, Stage5Output]):
     def metadata(self) -> StageMetadata:
         return StageMetadata(
             stage_id="geometry_cleanup",
-            stage_number=None,
             name="Manufacturing Geometry Cleanup",
             description="Translating digital pixels into weaveable geometry",
-            version="1.0.0",
-            author="TODO: Your Name"
+            version="1.0.0"
         )
     
-    def execute(self, input_data: Stage5Input) -> Stage5Output:
+    def validate_input(self, prev_result: Optional[StageResult], config: dict) -> None:
+        """
+        Validate that prev_result is RepeatEnforcementResult.
+        
+        TODO: Implement validation when Stage 4 is complete.
+        """
+        # TODO: Add proper validation
+        # if not isinstance(prev_result, RepeatEnforcementResult):
+        #     raise TypeError(
+        #         f"Stage 5 requires RepeatEnforcementResult, got {type(prev_result).__name__}"
+        #     )
+        pass
+    
+    def _execute(self, prev_result: Optional[StageResult], pipeline_id: str, config: dict) -> GeometryCleanupResult:
         """
         Execute Stage 5: Manufacturing Geometry Cleanup.
         
         TODO: Implement geometry cleanup logic
         
+        Expected config parameters:
+        - min_feature_width: Minimum manufacturable feature width in pixels (from global manufacturing)
+        - morphology_kernel_size: Kernel size for morphological operations
+        - remove_islands: bool - remove isolated pixel groups
+        - fill_holes: bool - fill holes in features
+        - simplify_geometry: bool - apply simplification
+        - simplification_tolerance: Tolerance for geometry simplification
+        - timeout_seconds: Maximum processing time
+        
         Args:
-            input_data: Stage 5 input
+            prev_result: Result from Stage 4 (RepeatEnforcementResult)
+            pipeline_id: Unique pipeline execution ID
+            config: Stage configuration with geometry cleanup parameters
         
         Returns:
-            Stage 5 output with cleaned geometry
+            GeometryCleanupResult with cleaned geometry
         """
         # TODO: Implement stage logic
+        # 1. Extract config parameters (merge global manufacturing constraints)
+        # 2. Load raster from prev_result
+        # 3. Apply minimum line width filter
+        # 4. Remove island pixels
+        # 5. Fill holes in features
+        # 6. Apply morphological operations
+        # 7. Simplify geometry if enabled
+        # 8. Validate all features meet manufacturing constraints
+        # 9. Build stage_metadata dict
+        # 10. Return GeometryCleanupResult
         
-        return Stage5Output(
-            stage_id=input_data.stage_id,
-            stage_number=input_data.stage_number,
-            status=StageStatus.COMPLETED,
-            message="Stage 5 execution placeholder - awaiting implementation",
-            data={},
-            metrics={}
+        raise NotImplementedError(
+            "Stage 5 (Geometry Cleanup) not yet implemented. "
+            "This is a placeholder for future development."
         )
 

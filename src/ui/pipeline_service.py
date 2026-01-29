@@ -7,8 +7,7 @@ import logging
 import streamlit as st
 from typing import Dict, Any, Optional, Callable
 
-from weaver.diffusion.service import DiffusionPipelineService
-from weaver.shared.config_loader import load_pipeline_config
+from services.diffusion_pipeline_service import DiffusionPipelineService
 
 
 logger = logging.getLogger(__name__)
@@ -24,28 +23,18 @@ class PipelineService:
     - Streamlit-specific error handling and display
     
     For REST API, CLI, or direct package usage, use the shared
-    weaver.services.DiffusionPipelineService directly.
+    services.DiffusionPipelineService directly.
     """
     
-    def __init__(self, workspace_base_dir: Optional[str] = None):
+    def __init__(self, storage_base_dir: Optional[str] = None):
         """
         Initialize the UI pipeline service.
         
         Args:
-            workspace_base_dir: Base directory for pipeline workspaces
+            storage_base_dir: Base directory for pipeline storage
         """
-        # Load pipeline configuration
-        try:
-            config = load_pipeline_config()
-            logger.info(f"Loaded pipeline configuration with {len(config.get('stages', []))} stages")
-        except Exception as e:
-            logger.warning(f"Failed to load pipeline configuration: {e}. Using empty config.")
-            config = {}
-        
-        self.service = DiffusionPipelineService(
-            workspace_base_dir=workspace_base_dir,
-            config=config
-        )
+        # Initialize shared service
+        self.service = DiffusionPipelineService(storage_base_dir=storage_base_dir)
         logger.info("Initialized Streamlit Pipeline Service (wrapping DiffusionPipelineService)")
 
     
@@ -60,7 +49,7 @@ class PipelineService:
         
         Args:
             image_path: Path to input image
-            config: Stage 0 configuration including:
+            config: Source data for stage 0 including:
                 - dpi: DPI value
                 - color_mode: Color mode
                 - repeat_unit: Repeat dimensions {width, height}
@@ -78,7 +67,7 @@ class PipelineService:
         
         Raises:
             PipelineExecutionError: If pipeline execution fails
-            ValueError: If configuration is invalid
+            ValidationError: If input validation fails
         """
         # Wrap progress callback with Streamlit-specific UI updates
         if progress_callback:
@@ -88,8 +77,8 @@ class PipelineService:
         
         # Delegate to shared service
         return self.service.execute_pipeline(
-            image_path=image_path,
-            config=config,
+            source_file=image_path,
+            source_data=config,
             progress_callback=streamlit_callback
         )
     
@@ -143,5 +132,5 @@ class PipelineService:
     
     def cleanup_pipeline(self, pipeline_id: str, remove_workspace: bool = False) -> None:
         """Clean up pipeline from shared service."""
-        self.service.cleanup_pipeline(pipeline_id, remove_workspace)
+        self.service.cleanup_pipeline(pipeline_id, remove_storage=remove_workspace)
 

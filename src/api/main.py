@@ -11,7 +11,7 @@ import logging
 # This must happen before any pipeline operations
 try:
     import weaver.diffusion.stages
-    logging.info(f"Loaded {weaver.diffusion.stages.get_registered_stage_count()} stages")
+    logging.info(f"Loaded {len(weaver.diffusion.stages.STAGE_CLASSES)} stages")
 except Exception as e:
     logging.warning(f"Failed to auto-register stages: {e}")
 

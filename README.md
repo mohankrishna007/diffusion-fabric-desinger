@@ -32,19 +32,38 @@ A **constraint-first AI pipeline** that:
 
 ## 🚀 Quick Start
 
-### Option 1: Automated Setup (Recommended)
+### Unified Launcher (Recommended)
+
+The easiest way to run Weaver AI - one script for all platforms!
 
 **Windows:**
-```powershell
-.\setup.ps1
+```cmd
+run.bat
 ```
 
 **macOS/Linux:**
 ```bash
-chmod +x setup.sh && ./setup.sh
+chmod +x run.sh
+./run.sh
 ```
 
-### Option 2: Manual Setup
+**Or run directly with Python:**
+```bash
+python run.py  # Windows
+python3 run.py  # Linux/Mac
+```
+
+The launcher provides a simple menu to:
+1. 🎨 Launch Design Studio (UI)
+2. 🔌 Start API Server
+3. 🧪 Run Tests
+4. 📦 Setup/Install Dependencies
+
+---
+
+### Manual Setup (Advanced)
+
+If you prefer manual control:
 
 ```bash
 # 1. Install UV package manager
@@ -54,47 +73,17 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"  # Windows
 
 # 2. Clone and install
 git clone <your-repo-url>
-cd diffusion-fabric-designer
+cd weaver-ai
 uv sync  # Creates venv + installs everything
 
-# 3. Run the API
-uv run python -m api.main
+# 3. Run what you need
+uv run streamlit run src/ui/streamlit_app.py  # UI
+uv run uvicorn api.main:app --reload          # API
+uv run pytest                                  # Tests
 ```
 
 **📖 API Documentation:** http://localhost:8000/docs
-
----
-
-## 🎨 Streamlit UI (NEW!)
-
-We now provide an **interactive web UI** for easy fabric design processing!
-
-### Launch the UI
-
-**Windows:**
-```powershell
-.\run_ui.ps1
-```
-
-**Linux/Mac:**
-```bash
-chmod +x run_ui.sh
-./run_ui.sh
-```
-
-**Manual Launch:**
-```bash
-streamlit run src/ui/streamlit_app.py
-```
-
-### Features
-- 📤 **Drag-and-drop image upload** with instant preview
-- 🔍 **Auto-detect Stage 0 configs** (DPI, color mode, repeat units)
-- ⚙️ **Interactive configuration editor** with real-time validation
-- 🚀 **One-click pipeline execution** with progress tracking
-- 📊 **Results visualization** with stage-by-stage outputs
-
-**📘 Full UI Guide:** [docs/UI_GUIDE.md](docs/UI_GUIDE.md)
+**🎨 Design Studio:** http://localhost:8501
 
 ---
 

@@ -1,143 +1,252 @@
-# Pipeline configuration
-# Manufacturing constraints and default settings for the fabric design pipeline
+# Weaver AI Configuration
+# Complete system configuration for textile design automation pipeline
 
-pipeline:
-  name: "Diffusion Fabric Designer"
-  version: "1.0.0"
+# Global settings (shared across all modules)
+global:
+  manufacturing:
+    min_line_width_pixels: 2
+    max_color_count: 16
+    max_image_width: 10000
+    max_image_height: 10000
+    border_tolerance_pixels: 0
+  
+  logging:
+    level: "INFO"
+    format: "structured"
+    output: "console"
 
-# Global manufacturing constraints
-manufacturing:
-  min_line_width_pixels: 2
-  max_color_count: 16
-  max_image_width: 10000
-  max_image_height: 10000
-  border_tolerance_pixels: 0  # Zero tolerance for repeat boundaries
-  
-# Image processing defaults
-image:
-  default_dpi: 300
-  color_space: "RGB"
-  # LOSSLESS FORMATS ONLY - JPEG forbidden per manufacturing mandate
-  # Lossy compression destroys thread-level precision needed for CAM export
-  supported_formats:
-    - ".bmp"
-    - ".png"
-    - ".tiff"
-    - ".tif"
-  output_format: ".bmp"
+# Preprocessing Module - Pre-processing operations before main pipeline
+preprocessing:
+  enabled: true
+  operations:
+    # Image enhancement
+    - name: "contrast_enhancement"
+      enabled: false
+      method: "adaptive_histogram"  # adaptive_histogram, clahe, gamma
+      clip_limit: 2.0
+      tile_grid_size: [8, 8]
+    
+    # Noise reduction
+    - name: "denoise"
+      enabled: false
+      method: "non_local_means"  # non_local_means, bilateral, gaussian
+      strength: 10
+      template_window_size: 7
+      search_window_size: 21
+    
+    # Background removal
+    - name: "background_removal"
+      enabled: false
+      method: "grabcut"  # grabcut, threshold, ai_model
+      iterations: 5
+    
+    # Image straightening
+    - name: "deskew"
+      enabled: false
+      method: "hough_transform"  # hough_transform, radon
+      max_angle: 10
+    
+    # Scaling/resizing
+    - name: "prescale"
+      enabled: false
+      target_dpi: null  # null = use source DPI
+      method: "lanczos"
 
-# Canonical raster standards (normalization target)
-canonical_raster:
-  # DPI enforcement - normalization will rescale pixels to match this canonical DPI
-  canonical_dpi: 300
-  
-  # Hybrid storage threshold - images larger than this are saved to .npy file
-  # Smaller images stored in-memory as NumPy arrays
-  memory_threshold_mb: 50
-  
-  # Color mode normalization target
-  color_mode: "RGB"
-  
-  # Bit depth normalization target (per channel)
-  bit_depth: 8
-  
-  # Alpha channel handling policy
-  # Options: FLATTEN_WHITE (composite on white), FLATTEN_BLACK (composite on black), STRIP (remove alpha)
-  alpha_policy: "FLATTEN_WHITE"
-  
-  # ICC color profile handling - strip embedded profiles for deterministic color interpretation
-  strip_icc_profile: true
-  
-  # Resampling algorithm for DPI rescaling
-  # Options: LANCZOS (high quality), BICUBIC, BILINEAR, NEAREST (preserve exact pixels)
-  resampling_method: "LANCZOS"
+# Diffusion Pipeline - AI-assisted fabric design with controlled diffusion
+diffusion:
+  pipeline:
+    name: "Diffusion Fabric Designer"
+    version: "1.0.0"
+    description: "AI-assisted textile design using diffusion models with manufacturing constraints"
+# Diffusion pipeline stages (executed in sequential order)
+  stages:
+    # Stage 0: Input Acquisition - Validate raw input
+    - id: "input_acquisition"
+      name: "Input Acquisition"
+      class_name: "InputAcquisitionStage"
+      config:
+        timeout_seconds: 60
+        # Lossless formats only - JPEG forbidden per manufacturing mandate
+        supported_formats:
+          - ".bmp"
+          - ".png"
+          - ".tiff"
+          - ".tif"
+        default_dpi: 300
+        color_mode: "RGB"
+        # Note: Validation limits (DPI, dimensions, file size) defined in constants.py
+      
+    # Stage 1: Canonical Normalization - Convert to deterministic representation
+    - id: "canonical_normalization"
+      name: "Canonical Normalization"
+      class_name: "CanonicalNormalizationStage"
+      config:
+        timeout_seconds: 120
+        # DPI normalization - rescale pixels to canonical DPI
+        canonical_dpi: 300
+        # Hybrid storage threshold (images > 50MB saved to .npy file)
+        memory_threshold_mb: 50
+        # Alpha channel handling: FLATTEN_WHITE, FLATTEN_BLACK, or STRIP
+        alpha_policy: "FLATTEN_WHITE"
+        # Strip ICC profiles for deterministic color interpretation
+        strip_icc_profile: true
+        # Resampling algorithm: LANCZOS, BICUBIC, BILINEAR, NEAREST
+        resampling_method: "LANCZOS"
+      
+    # Stage 2: Structural Intent Definition - Extract geometric invariants
+    - id: "structural_intent"
+      name: "Structural Intent Definition"
+      class_name: "StructuralIntentStage"
+      config:
+        timeout_seconds: 180
+        # Edge detection configuration
+        edge_detection_method: "canny"
+        canny_threshold1: 50
+        canny_threshold2: 150
+        # Boundary mask safety margin (pixels from edge)
+        boundary_margin: 0
+      
+    # Stage 3: Diffusion Refinement - AI-assisted smoothing (TODO: Implement)
+    - id: "diffusion_refinement"
+      name: "Controlled Diffusion Refinement"
+      class_name: "DiffusionRefinementStage"
+      config:
+        timeout_seconds: 1800  # 30 minutes
+        # Diffusion model configuration
+        model: "stable-diffusion-v1.5"
+        denoise_strength: 0.3  # Low to preserve structure
+        guidance_scale: 7.5
+        num_inference_steps: 50
+        # ControlNet for structure preservation
+        use_controlnet: true
+        controlnet_conditioning_scale: 1.0
+        # Structure preservation threshold
+        structural_preservation_threshold: 0.95
+      
+    # Stage 4: Repeat Enforcement - Validate perfect tiling (TODO: Implement)
+    - id: "repeat_enforcement"
+      name: "Repeat & Boundary Enforcement"
+      class_name: "RepeatEnforcementStage"
+      config:
+        timeout_seconds: 120
+        # Zero tolerance for boundary misalignment
+        border_tolerance: 0
+        # Auto-correction settings
+        auto_correct_boundaries: false
+        correction_method: "blend"  # blend, mirror, or tile
+      
+    # Stage 5: Geometry Cleanup - Manufacturing constraints (TODO: Implement)
+    - id: "geometry_cleanup"
+      name: "Manufacturing Geometry Cleanup"
+      class_name: "GeometryCleanupStage"
+      config:
+        timeout_seconds: 180
+        # Minimum manufacturable feature width (pixels)
+        min_feature_width: 2
+        # Morphology operations
+        morphology_kernel_size: 3
+        remove_islands: true
+        fill_holes: true
+        # Simplification settings
+        simplify_geometry: true
+        simplification_tolerance: 1.0
+      
+    # Stage 6: Color Constraint - Thread palette enforcement (TODO: Implement)
+    - id: "color_constraint"
+      name: "Color & Thread Constraint Enforcement"
+      class_name: "ColorConstraintStage"
+      config:
+        timeout_seconds: 120
+        # Maximum thread colors
+        max_colors: 16
+        # Color quantization method: kmeans, median_cut, or octree
+        quantization_method: "kmeans"
+        # Dithering settings
+        apply_dithering: false
+        dithering_method: "floyd_steinberg"
+        # Thread palette (optional - can be auto-generated)
+        thread_palette: null
+      
+    # Stage 7: Pre-CAM Validation - Final firewall (TODO: Implement)
+    - id: "precam_validation"
+      name: "Pre-CAM Validation Firewall"
+      class_name: "PreCAMValidationStage"
+      config:
+        timeout_seconds: 60
+        # Validation strictness
+        zero_tolerance: true
+        # Validation checks
+        validate_dimensions: true
+        validate_repeat_integrity: true
+        validate_color_count: true
+        validate_feature_width: true
+        validate_border_alignment: true
+        # Output format for CAM
+        output_format: ".bmp"
 
-# Dynamic stage configuration
-# Stages are executed in the order defined here
-# Each stage can declare dependencies on previous stages
-stages:
-  - id: "input_acquisition"
-    name: "Input Acquisition"
-    class_name: "InputAcquisitionStage"
-    enabled: true
-    dependencies: []
-    config:
-      timeout_seconds: 60
-      # Note: Validation limits (DPI, dimensions, file size) are defined in
-      # src/weaver/shared/constants.py as immutable manufacturing constraints
+# CAM Compiler Module - Convert validated design to Jacquard machine format
+cam_compiler:
+  enabled: true
+  
+  # Target loom configuration
+  loom:
+    type: "jacquard"  # jacquard, dobby, or manual
+    manufacturer: "staubli"  # staubli, bonas, grosse, etc.
+    model: "jc5"
+    hooks: 10080  # Number of warp threads/hooks
+    max_picks: 99999  # Maximum weft picks
     
-  - id: "canonical_normalization"
-    name: "Canonical Normalization"
-    class_name: "CanonicalNormalizationStage"
-    enabled: true
-    dependencies: ["input_acquisition"]
-    config:
-      timeout_seconds: 120
-      target_dpi: 300
+  # Weave structure settings
+  weave:
+    structure: "plain"  # plain, twill, satin, custom
+    warp_density: 120  # ends per inch
+    weft_density: 80   # picks per inch
+    warp_yarn_count: "30s"
+    weft_yarn_count: "30s"
     
-  - id: "structural_intent"
-    name: "Structural Intent Definition"
-    class_name: "StructuralIntentStage"
-    enabled: true
-    dependencies: ["canonical_normalization"]
-    config:
-      timeout_seconds: 180
-      edge_detection_method: "canny"
-      canny_threshold1: 50
-      canny_threshold2: 150
+  # Color mapping
+  color_mapping:
+    mode: "thread_palette"  # thread_palette, weave_structure, or hybrid
+    # Map design colors to physical thread colors
+    thread_colors:
+      - id: 1
+        hex: "#FFFFFF"
+        name: "White"
+        material: "cotton"
+      - id: 2
+        hex: "#000000"
+        name: "Black"
+        material: "cotton"
+      # Additional thread colors (up to 16)
     
-  - id: "diffusion_refinement"
-    name: "Controlled Diffusion Refinement"
-    class_name: "DiffusionRefinementStage"
-    enabled: true
-    dependencies: ["structural_intent"]
-    config:
-      timeout_seconds: 1800  # 30 minutes
-      denoise_strength: 0.3  # Low to preserve structure
-      model: "stable-diffusion-v1.5"
-      use_controlnet: true
+  # Output format settings
+  output:
+    format: "jc5"  # jc5, wif, dtx, etc.
+    encoding: "binary"  # binary or ascii
+    compression: true
+    include_metadata: true
     
-  - id: "repeat_enforcement"
-    name: "Repeat & Boundary Enforcement"
-    class_name: "RepeatEnforcementStage"
-    enabled: true
-    dependencies: ["diffusion_refinement"]
-    config:
-      timeout_seconds: 120
-      border_tolerance: 0  # Zero tolerance
+    # File structure
+    generate_pattern_file: true    # Main pattern data
+    generate_colorway_file: true   # Color definitions
+    generate_setup_file: true      # Loom setup instructions
     
-  - id: "geometry_cleanup"
-    name: "Manufacturing Geometry Cleanup"
-    class_name: "GeometryCleanupStage"
-    enabled: true
-    dependencies: ["repeat_enforcement"]
-    config:
-      timeout_seconds: 180
-      min_feature_width: 2
-      morphology_kernel_size: 3
-      remove_islands: true
+  # Validation before export
+  validation:
+    verify_hook_count: true
+    verify_color_count: true
+    verify_repeat_integrity: true
+    check_tension_balance: true
     
-  - id: "color_constraint"
-    name: "Color & Thread Constraint Enforcement"
-    class_name: "ColorConstraintStage"
-    enabled: true
-    dependencies: ["geometry_cleanup"]
-    config:
-      timeout_seconds: 120
-      max_colors: 16
-      quantization_method: "kmeans"
+  # Optimization
+  optimization:
+    minimize_float_yarns: true
+    optimize_weft_insertion: true
+    reduce_color_changes: true
     
-  - id: "precam_validation"
-    name: "Pre-CAM Validation Firewall"
-    class_name: "PreCAMValidationStage"
-    enabled: true
-    dependencies: ["color_constraint"]
-    config:
-      timeout_seconds: 60
-      zero_tolerance: true
-
-# Logging configuration
-logging:
-  level: "INFO"
-  format: "structured"
-  output: "console"
+  # Export paths (relative to storage/<pipeline_id>/)
+  export_paths:
+    pattern_file: "cam/pattern.jc5"
+    colorway_file: "cam/colorway.jc5"
+    setup_file: "cam/setup.txt"
+    preview_file: "cam/preview.png"

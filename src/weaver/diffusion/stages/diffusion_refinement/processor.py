@@ -3,47 +3,28 @@ Stage 3: Controlled Diffusion Refinement
 Responsibility: Smoothing and refining geometry via AI.
 
 TODO for Developer:
-1. Implement the execute() method to:
+1. Implement _execute() method to:
    - Initialize Stable Diffusion + ControlNet
-   - Apply guidance from Stage 2 (edge maps, etc.)
+   - Apply guidance from Stage 2 (edge maps, boundary masks)
    - Configure denoise strength (low to preserve structure)
    - Ensure motif topology remains unchanged
    - Verify no new motifs created, none deleted
-
-2. Extend Stage3Input schema with guidance bundle
-3. Extend Stage3Output schema with refined raster
-4. Implement topology validation
+   - Validate structural preservation threshold
+2. Integrate AI model (Stable Diffusion + ControlNet)
+3. Add topology validation comparing pre/post refinement
+4. Build stage_metadata dict with diffusion metrics
 5. Add unit tests in tests/stages/test_stage_3.py
 
-NOTE: This stage may require GPU resources and significant processing time.
-Consider implementing timeout handling and progress reporting.
+NOTE: This stage requires GPU resources and significant processing time.
+Implement timeout handling and progress reporting.
 """
 
-from weaver.diffusion.stages.base import BaseStage, StageMetadata
-from weaver.diffusion.orchestrator.stage_registry import stage_registry
-from weaver.shared.schemas import StageInput, StageOutput, StageStatus
+from typing import Optional
+from weaver.diffusion.stages.base_stage import BaseStage, StageMetadata
+from weaver.diffusion.stages.stage_result import StageResult, DiffusionRefinementResult
 
 
-class Stage3Input(StageInput):
-    """Input schema for Stage 3."""
-    # TODO: Add guidance bundle fields from Stage 2
-    pass
-
-
-class Stage3Output(StageOutput):
-    """Output schema for Stage 3."""
-    # TODO: Add refined raster fields
-    pass
-
-
-@stage_registry.register(
-    stage_id="diffusion_refinement",
-    display_name="Controlled Diffusion Refinement",
-    description="Apply geometry-aware AI refinement while preserving structural invariants",
-    dependencies=["structural_intent"],
-    version="1.0.0"
-)
-class DiffusionRefinementStage(BaseStage[Stage3Input, Stage3Output]):
+class DiffusionRefinementStage(BaseStage):
     """
     Stage 3: Controlled Diffusion Refinement
     
@@ -57,34 +38,59 @@ class DiffusionRefinementStage(BaseStage[Stage3Input, Stage3Output]):
     def metadata(self) -> StageMetadata:
         return StageMetadata(
             stage_id="diffusion_refinement",
-            stage_number=None,
             name="Controlled Diffusion Refinement",
             description="Smoothing and refining geometry via AI",
-            version="1.0.0",
-            author="TODO: Your Name"
+            version="1.0.0"
         )
     
-    def execute(self, input_data: Stage3Input) -> Stage3Output:
+    def validate_input(self, prev_result: Optional[StageResult], config: dict) -> None:
+        """
+        Validate that prev_result is StructuralIntentResult.
+        
+        TODO: Implement validation when Stage 2 is complete.
+        """
+        # TODO: Add proper validation
+        # if not isinstance(prev_result, StructuralIntentResult):
+        #     raise TypeError(
+        #         f"Stage 3 requires StructuralIntentResult, got {type(prev_result).__name__}"
+        #     )
+        pass
+    
+    def _execute(self, prev_result: Optional[StageResult], pipeline_id: str, config: dict) -> DiffusionRefinementResult:
         """
         Execute Stage 3: Controlled Diffusion Refinement.
         
         TODO: Implement AI refinement logic
         
+        Expected config parameters:
+        - model: Diffusion model name (e.g., "stable-diffusion-v1.5")
+        - denoise_strength: 0.0-1.0 (low to preserve structure)
+        - guidance_scale: Guidance strength
+        - num_inference_steps: Number of diffusion steps
+        - use_controlnet: bool
+        - controlnet_conditioning_scale: 0.0-1.0
+        - structural_preservation_threshold: Minimum similarity threshold
+        - timeout_seconds: Maximum processing time
+        
         Args:
-            input_data: Stage 3 input with guidance bundle
+            prev_result: Result from Stage 2 (StructuralIntentResult)
+            pipeline_id: Unique pipeline execution ID
+            config: Stage configuration with diffusion parameters
         
         Returns:
-            Stage 3 output with refined raster
+            DiffusionRefinementResult with refined raster
         """
         # TODO: Implement stage logic
-        # This will be the most complex stage requiring AI model integration
+        # 1. Extract config parameters
+        # 2. Load canonical raster and structural guidance from prev_result
+        # 3. Initialize Stable Diffusion + ControlNet
+        # 4. Apply diffusion refinement with structural conditioning
+        # 5. Validate topology preservation
+        # 6. Build stage_metadata dict
+        # 7. Return DiffusionRefinementResult
         
-        return Stage3Output(
-            stage_id=input_data.stage_id,
-            stage_number=input_data.stage_number,
-            status=StageStatus.COMPLETED,
-            message="Stage 3 execution placeholder - awaiting implementation",
-            data={},
-            metrics={}
+        raise NotImplementedError(
+            "Stage 3 (Diffusion Refinement) not yet implemented. "
+            "This is a placeholder for future AI integration."
         )
 

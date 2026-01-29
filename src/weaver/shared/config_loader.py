@@ -65,16 +65,22 @@ def validate_config_structure(config: Dict[str, Any]) -> None:
     Raises:
         ValueError: If configuration is invalid
     """
-    if 'stages' not in config:
-        logger.warning("Configuration missing 'stages' section - pipeline may not execute")
+    # Check for diffusion module stages
+    if 'diffusion' not in config:
+        logger.warning("Configuration missing 'diffusion' module - pipeline may not execute")
         return
     
-    stages = config['stages']
+    diffusion_config = config['diffusion']
+    if 'stages' not in diffusion_config:
+        logger.warning("Diffusion module missing 'stages' section - pipeline may not execute")
+        return
+    
+    stages = diffusion_config['stages']
     if not isinstance(stages, list):
-        raise ValueError("'stages' section must be a list")
+        raise ValueError("'diffusion.stages' section must be a list")
     
     if not stages:
-        logger.warning("'stages' list is empty - no stages configured")
+        logger.warning("'diffusion.stages' list is empty - no stages configured")
         return
     
     # Validate each stage has required fields
