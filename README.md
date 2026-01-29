@@ -65,6 +65,39 @@ uv run python -m weaver.api.main
 
 ---
 
+## 🎨 Streamlit UI (NEW!)
+
+We now provide an **interactive web UI** for easy fabric design processing!
+
+### Launch the UI
+
+**Windows:**
+```powershell
+.\run_ui.ps1
+```
+
+**Linux/Mac:**
+```bash
+chmod +x run_ui.sh
+./run_ui.sh
+```
+
+**Manual Launch:**
+```bash
+streamlit run src/weaver/ui/streamlit_app.py
+```
+
+### Features
+- 📤 **Drag-and-drop image upload** with instant preview
+- 🔍 **Auto-detect Stage 0 configs** (DPI, color mode, repeat units)
+- ⚙️ **Interactive configuration editor** with real-time validation
+- 🚀 **One-click pipeline execution** with progress tracking
+- 📊 **Results visualization** with stage-by-stage outputs
+
+**📘 Full UI Guide:** [docs/UI_GUIDE.md](docs/UI_GUIDE.md)
+
+---
+
 ## ⚙️ How It Works
 
 The pipeline processes designs through **8 sequential stages**, each enforcing specific manufacturing constraints:
@@ -177,6 +210,10 @@ diffusion-fabric-designer/
 │   ├── api/                       # 🌐 REST API Layer
 │   │   ├── main.py               # FastAPI app
 │   │   └── routes/               # API endpoints
+│   ├── ui/                       # 🎨 Streamlit UI (NEW!)
+│   │   ├── streamlit_app.py     # Main UI app
+│   │   ├── config_detector.py   # Auto-detect Stage 0 configs
+│   │   └── pipeline_service.py  # Pipeline integration
 │   ├── orchestrator/             # 🎭 Pipeline Engine
 │   │   ├── pipeline_engine.py    # Sequential executor
 │   │   └── stage_loader.py       # Dynamic stage loading
@@ -199,8 +236,10 @@ diffusion-fabric-designer/
 │   └── pipeline.yaml            # ⚙️ Manufacturing constraints
 ├── tests/                       # 🧪 Test suite
 ├── docs/
+│   ├── UI_GUIDE.md              # 📘 Streamlit UI documentation
 │   └── DEVELOPER_GUIDE.md       # 📖 Stage implementation guide
 ├── pyproject.toml               # 📦 Dependencies & metadata
+├── run_ui.ps1 / run_ui.sh       # 🚀 Launch Streamlit UI
 └── setup.ps1 / setup.sh         # 🚀 Quick setup scripts
 ```
 
