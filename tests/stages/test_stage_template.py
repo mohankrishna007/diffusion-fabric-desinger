@@ -8,7 +8,7 @@ from weaver.shared.schemas import StageStatus
 from weaver.shared.exceptions import ValidationError
 
 # TODO: Import your stage
-# from weaver.stages.stage_X.processor import StageXProcessor, StageXInput, StageXOutput
+# from weaver.diffusion.stages.stage_X.processor import StageXProcessor, StageXInput, StageXOutput
 
 
 class TestStageX:

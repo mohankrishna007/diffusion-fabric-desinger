@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "diffusion-fabric-designer"
+name = "weaver"
 version = "1.0.0"
-description = "Diffusion Fabric Designer - AI-Powered Fabric Design Pipeline for Manufacturing"
+description = "Fabric Designer - AI-Powered Fabric Design Pipeline for Manufacturing"
 authors = [
     {name = "Diffusion Fabric Designer Team"}
 ]
@@ -30,12 +30,14 @@ dependencies = [
     "Pillow>=10.2.0",
     "opencv-python>=4.9.0.80",
     "numpy>=1.26.3",
+    "scipy>=1.11.4",
     "scikit-image>=0.22.0",
     "networkx>=3.2.1",
     "PyYAML>=6.0.1",
     "python-dotenv>=1.0.0",
     "python-multipart>=0.0.6",
     "aiofiles>=23.2.1",
+    "streamlit>=1.30.0",
 ]
 
 [project.optional-dependencies]
