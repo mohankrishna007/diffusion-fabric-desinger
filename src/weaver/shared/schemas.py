@@ -33,42 +33,6 @@ class PipelineStatus(str, Enum):
     FAILED = "failed"
 
 
-class StageInput(BaseModel):
-    """
-    Base input schema for all stages.
-    Each stage extends this with specific fields.
-    """
-    model_config = ConfigDict(
-        frozen=True,
-        extra='forbid',
-        str_strip_whitespace=True
-    )
-    
-    pipeline_id: str = Field(..., description="Unique pipeline execution ID")
-    stage_id: str = Field(..., description="Stage identifier")
-    stage_number: Optional[int] = Field(default=None, description="Stage execution order (optional)")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
-
-
-class StageOutput(BaseModel):
-    """
-    Base output schema for all stages.
-    Each stage extends this with specific result fields.
-    """
-    model_config = ConfigDict(
-        frozen=True,
-        extra='forbid'
-    )
-    
-    stage_id: str = Field(..., description="Stage identifier")
-    stage_number: Optional[int] = Field(default=None, description="Stage execution order (optional)")
-    status: StageStatus = Field(..., description="Execution status")
-    message: str = Field(default="", description="Status message")
-    data: Dict[str, Any] = Field(default_factory=dict, description="Output data")
-    metrics: Dict[str, Any] = Field(default_factory=dict, description="Execution metrics")
-    errors: list[str] = Field(default_factory=list, description="Validation errors")
-
-
 class PipelineContext(BaseModel):
     """
     Shared context passed through the pipeline execution.
@@ -83,15 +47,6 @@ class PipelineContext(BaseModel):
     workspace_dir: Optional[str] = Field(default=None, description="Workspace directory for stage artifacts")
     config: Dict[str, Any] = Field(default_factory=dict, description="Pipeline configuration")
     stage_outputs: Dict[str, Any] = Field(default_factory=dict, description="Outputs from completed stages (StageResult objects)")
-
-
-class ValidationResult(BaseModel):
-    """Result of contract validation."""
-    model_config = ConfigDict(frozen=True)
-    
-    is_valid: bool = Field(..., description="Whether validation passed")
-    errors: list[str] = Field(default_factory=list, description="Validation error messages")
-    warnings: list[str] = Field(default_factory=list, description="Validation warnings")
 
 
 class PipelineExecutionRequest(BaseModel):
@@ -205,45 +160,6 @@ class PipelineStatusResponse(BaseModel):
     updated_at: datetime = Field(..., description="Last update timestamp")
     result: Optional[Dict[str, Any]] = Field(None, description="Final pipeline result if completed")
     errors: list[str] = Field(default_factory=list, description="Error messages if failed")
-
-
-class ErrorDetail(BaseModel):
-    """Detailed error information."""
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "message": "Pipeline execution failed at stage 0",
-                "details": {
-                    "pipeline_id": "550e8400-e29b-41d4-a716-446655440000",
-                    "error": "File format '.jpg' not allowed. Only lossless formats permitted: ['.bmp', '.png', '.tiff', '.tif']",
-                    "completed_stages": []
-                }
-            }
-        }
-    )
-    
-    message: str = Field(..., description="Error message")
-    details: Dict[str, Any] = Field(default_factory=dict, description="Additional error details")
-
-
-class ErrorResponse(BaseModel):
-    """Standard error response."""
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "detail": {
-                    "message": "Pipeline execution failed at stage 0",
-                    "details": {
-                        "pipeline_id": "550e8400-e29b-41d4-a716-446655440000",
-                        "error": "File format '.jpg' not allowed. Only lossless formats permitted: ['.bmp', '.png', '.tiff', '.tif']",
-                        "completed_stages": []
-                    }
-                }
-            }
-        }
-    )
-    
-    detail: ErrorDetail = Field(..., description="Error details")
 
 
 # ============================================================================

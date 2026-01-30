@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "diffusion-fabric-designer"
+name = "weaver"
 version = "1.0.0"
-description = "Diffusion Fabric Designer - AI-Powered Fabric Design Pipeline for Manufacturing"
+description = "Fabric Designer - AI-Powered Fabric Design Pipeline for Manufacturing"
 authors = [
     {name = "Diffusion Fabric Designer Team"}
 ]
