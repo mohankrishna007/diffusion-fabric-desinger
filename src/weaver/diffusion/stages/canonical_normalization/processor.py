@@ -201,6 +201,7 @@ class CanonicalNormalizationStage(BaseStage):
         pipeline_time_ms = int((time.time() - pipeline_start) * 1000)
         
         # STEP 6: Emit canonical raster (RasterEmitter)
+        # Always saves to file, Stage 2 loads from disk
         storage_dir = Path(WORKSPACE_BASE_DIR) / pipeline_id
         
         canonical_raster = emit_canonical_raster(
@@ -213,7 +214,7 @@ class CanonicalNormalizationStage(BaseStage):
         )
         
         total_time_ms = int((time.time() - start_time) * 1000)
-        storage_type = "in_memory" if canonical_raster.pixel_array is not None else "file"
+        storage_type = "file"  # Always file-based storage
         original_size_str = f"{original_size[0]}x{original_size[1]}"
         canonical_size_str = f"{canonical_raster.width_px}x{canonical_raster.height_px}"
         

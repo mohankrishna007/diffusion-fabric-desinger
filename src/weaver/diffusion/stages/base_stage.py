@@ -4,11 +4,15 @@ All pipeline stages must inherit from BaseStage and implement the execute method
 Each stage produces a Result that the next stage consumes.
 """
 
+import logging
 from abc import ABC, abstractmethod
+from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import TypeVar, Generic, Optional, Any
 
 from weaver.diffusion.stages.stage_result import StageResult
+
+logger = logging.getLogger(__name__)
 
 
 class StageMetadata(BaseModel):
@@ -57,11 +61,12 @@ class BaseStage(ABC):
 
     def execute(self, prev_result: Optional[StageResult], pipeline_id: str, config: dict) -> StageResult:
         """
-        Execute the stage's core logic with automatic input validation.
+        Execute the stage's core logic with automatic input validation and result saving.
         
         This is a template method that:
         1. Calls validate_input() to verify prev_result
         2. Calls _execute() to perform the actual stage logic
+        3. Automatically saves the result to JSON
         
         Do not override this method. Override _execute() instead.
         
@@ -77,7 +82,19 @@ class BaseStage(ABC):
             StageError: If execution fails
         """
         self.validate_input(prev_result, config)
-        return self._execute(prev_result, pipeline_id, config)
+        result = self._execute(prev_result, pipeline_id, config)
+        
+        # Automatically save result to JSON
+        try:
+            stage_metadata = result.stage_metadata
+            stage_num = stage_metadata.get('stage_number', 'unknown')
+            storage_path = Path("storage") / pipeline_id / f"stage_{stage_num}_result.json"
+            result.save_json(storage_path, indent=2)
+            logger.info(f"Saved stage {stage_num} result to {storage_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save stage result to JSON: {e}")
+        
+        return result
 
     @abstractmethod
     def _execute(self, prev_result: Optional[StageResult], pipeline_id: str, config: dict) -> StageResult:

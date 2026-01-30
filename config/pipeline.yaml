@@ -93,18 +93,23 @@ diffusion:
         # Resampling algorithm: LANCZOS, BICUBIC, BILINEAR, NEAREST
         resampling_method: "LANCZOS"
       
-    # Stage 2: Structural Intent Definition - Extract geometric invariants
+    # Stage 2: Structural Intent Extraction - Resolution-independent symbolic representation
     - id: "structural_intent"
-      name: "Structural Intent Definition"
+      name: "Structural Intent Extraction"
       class_name: "StructuralIntentStage"
       config:
         timeout_seconds: 180
-        # Edge detection configuration
+        # Edge detection configuration (preprocessing only)
         edge_detection_method: "canny"
         canny_threshold1: 50
         canny_threshold2: 150
-        # Boundary mask safety margin (pixels from edge)
-        boundary_margin: 0
+        # Curve intent analysis
+        curve_linearity_threshold: 0.1  # Below this scale, curves classified as LINEAR
+        # Symmetry detection
+        symmetry_min_confidence: 0.5  # Minimum confidence to report symmetry
+        symmetry_detection: "REQUIRED"  # REQUIRED, OPTIONAL, or DISABLED
+        # Skeleton island handling
+        island_confidence_threshold: 0.3  # Confidence assigned to skeleton islands
       
     # Stage 3: Diffusion Refinement - AI-assisted smoothing (TODO: Implement)
     - id: "diffusion_refinement"

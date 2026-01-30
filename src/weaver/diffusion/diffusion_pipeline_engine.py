@@ -240,17 +240,6 @@ class DiffusionPipelineEngine:
             # Store result in context
             context.stage_outputs[stage_id] = result
             
-            # Save stage metadata to JSON file
-            storage_dir = Path("storage") / context.pipeline_id
-            storage_dir.mkdir(parents=True, exist_ok=True)
-            metadata_file = storage_dir / f"{stage_id}_metadata.json"
-            
-            # stage_metadata is always a dict in StageResult
-            with open(metadata_file, 'w', encoding='utf-8') as f:
-                json.dump(result.stage_metadata, f, indent=2, default=str)
-            
-            logger.debug(f"Saved stage metadata to {metadata_file}")
-            
             # Update execution history
             self._execution_history[context.pipeline_id]["completed_stages"].append(stage_id)
             if hasattr(result, 'model_dump'):

@@ -37,19 +37,19 @@ def emit_canonical_raster(
     memory_threshold_mb: int
 ) -> CanonicalRaster:
     """
-    Convert PIL Image to canonical raster with hybrid storage.
+    Convert PIL Image to canonical raster with file-based storage.
     
     WHY:
     Canonical raster is the SINGLE SOURCE OF TRUTH for all downstream stages.
     It must be:
     1. Deterministic (exact pixel values, no encoding)
-    2. Efficient (in-memory for small images, file for large)
+    2. Efficient (file-based to avoid passing large arrays)
     3. Type-safe (NumPy array with enforced shape/dtype)
     
-    Hybrid Storage Strategy:
+    Storage Strategy:
     - ALWAYS save .npy file (single source of truth on disk)
-    - Small images (< threshold): ALSO store in-memory for performance
-    - Large images (>= threshold): Only file path (memory efficient)
+    - NEVER keep in-memory (Stage 2 loads from disk)
+    - Ensures clean memory management between stages
     
     Why .npy format?
     - Lossless (exact dtype and shape preservation)
@@ -63,10 +63,10 @@ def emit_canonical_raster(
         storage_dir: Directory for .npy file storage
         dpi: Canonical DPI
         repeat_unit_px: Repeat unit {width, height} dict
-        memory_threshold_mb: Threshold for in-memory vs file storage
+        memory_threshold_mb: UNUSED (kept for backward compatibility)
         
     Returns:
-        CanonicalRaster with either pixel_array or pixel_array_path set
+        CanonicalRaster with pixel_array_path set, pixel_array=None
         
     Raises:
         CanonicalizationError: If raster emission fails
@@ -107,42 +107,27 @@ def emit_canonical_raster(
         )
         
         # ALWAYS save to file (source of truth)
+        # Stage 2 will load from file path only (no in-memory transfer)
         storage_dir.mkdir(parents=True, exist_ok=True)
         npy_path = storage_dir / "canonical_raster.npy"
         np.save(str(npy_path), pixel_array)
         logger.debug(f"Saved canonical raster to {npy_path} ({memory_size_mb:.2f}MB)")
         
-        # Decide whether to ALSO keep in-memory for performance
-        if memory_size_mb < memory_threshold_mb:
-            # Small image: keep in-memory AND file
-            logger.debug(f"Keeping in-memory (below {memory_threshold_mb}MB threshold)")
-            
-            return CanonicalRaster(
-                schema_version="stage1.v1",
-                width_px=width_px,
-                height_px=height_px,
-                dpi=dpi,
-                color_mode="RGB",
-                bit_depth=8,
-                pixel_array=pixel_array,
-                pixel_array_path=str(npy_path),
-                repeat_unit_px=repeat_unit_px
-            )
-        else:
-            # Large image: file only (memory efficient)
-            logger.debug(f"File only (above {memory_threshold_mb}MB threshold)")
-            
-            return CanonicalRaster(
-                schema_version="stage1.v1",
-                width_px=width_px,
-                height_px=height_px,
-                dpi=dpi,
-                color_mode="RGB",
-                bit_depth=8,
-                pixel_array=None,
-                pixel_array_path=str(npy_path),
-                repeat_unit_px=repeat_unit_px
-            )
+        # ALWAYS return file path only (never in-memory)
+        # This ensures Stage 2 loads from disk, not memory
+        logger.debug("Returning file path only (Stage 2 will load from disk)")
+        
+        return CanonicalRaster(
+            schema_version="stage1.v1",
+            width_px=width_px,
+            height_px=height_px,
+            dpi=dpi,
+            color_mode="RGB",
+            bit_depth=8,
+            pixel_array=None,
+            pixel_array_path=str(npy_path),
+            repeat_unit_px=repeat_unit_px
+        )
         
     except CanonicalizationError:
         raise

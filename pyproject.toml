@@ -30,6 +30,7 @@ dependencies = [
     "Pillow>=10.2.0",
     "opencv-python>=4.9.0.80",
     "numpy>=1.26.3",
+    "scipy>=1.11.4",
     "scikit-image>=0.22.0",
     "networkx>=3.2.1",
     "PyYAML>=6.0.1",
