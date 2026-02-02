@@ -33,58 +33,210 @@ from weaver.shared.constants import (
 
 # Page configuration
 st.set_page_config(
-    page_title="Weaver AI - Fabric Design Studio",
-    page_icon="🧵",
+    page_title="Weaver Studio - Professional Fabric Design",
+    page_icon="◆",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# Custom CSS
+# Professional Design Studio CSS
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #2E86AB;
-        text-align: center;
-        margin-bottom: 1rem;
+    /* Global Theme */
+    :root {
+        --studio-dark: #1a1a1a;
+        --studio-charcoal: #2d2d2d;
+        --studio-accent: #e8aa42;
+        --studio-accent-hover: #d69a32;
+        --studio-border: #404040;
+        --studio-text: #e0e0e0;
+        --studio-muted: #999999;
+        --studio-success: #4caf50;
+        --studio-error: #f44336;
+        --studio-warning: #ff9800;
     }
-    .sub-header {
-        font-size: 1.2rem;
-        color: #555;
-        text-align: center;
-        margin-bottom: 2rem;
+    
+    /* Main Container */
+    .main {
+        background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+        color: var(--studio-text);
     }
-    .success-box {
-        padding: 1rem;
-        background-color: #d4edda;
-        border-left: 5px solid #28a745;
+    
+    /* Header Styling */
+    .studio-header {
+        background: var(--studio-charcoal);
+        padding: 2rem 3rem;
+        border-bottom: 1px solid var(--studio-border);
+        margin: -1rem -1rem 2rem -1rem;
+    }
+    
+    .studio-logo {
+        font-size: 1.8rem;
+        font-weight: 300;
+        letter-spacing: 0.15em;
+        color: var(--studio-accent);
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+        text-transform: uppercase;
+    }
+    
+    .studio-tagline {
+        font-size: 0.9rem;
+        color: var(--studio-muted);
+        font-weight: 300;
+        letter-spacing: 0.05em;
+        margin-top: 0.25rem;
+    }
+    
+    /* Section Headers */
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: var(--studio-text);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin: 2rem 0 1rem 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--studio-border);
+    }
+    
+    /* Professional Cards */
+    .studio-card {
+        background: var(--studio-charcoal);
+        border: 1px solid var(--studio-border);
+        border-radius: 4px;
+        padding: 1.5rem;
         margin: 1rem 0;
+        transition: border-color 0.2s ease;
     }
-    .error-box {
-        padding: 1rem;
-        background-color: #f8d7da;
-        border-left: 5px solid #dc3545;
+    
+    .studio-card:hover {
+        border-color: var(--studio-accent);
+    }
+    
+    /* Status Indicators */
+    .status-success {
+        background: rgba(76, 175, 80, 0.1);
+        border-left: 3px solid var(--studio-success);
+        padding: 1rem 1.5rem;
         margin: 1rem 0;
+        border-radius: 2px;
     }
-    .info-box {
-        padding: 1rem;
-        background-color: #d1ecf1;
-        border-left: 5px solid #17a2b8;
+    
+    .status-error {
+        background: rgba(244, 67, 54, 0.1);
+        border-left: 3px solid var(--studio-error);
+        padding: 1rem 1.5rem;
         margin: 1rem 0;
+        border-radius: 2px;
     }
-    .warning-box {
-        padding: 1rem;
-        background-color: #fff3cd;
-        border-left: 5px solid #ffc107;
+    
+    .status-warning {
+        background: rgba(255, 152, 0, 0.1);
+        border-left: 3px solid var(--studio-warning);
+        padding: 1rem 1.5rem;
         margin: 1rem 0;
+        border-radius: 2px;
     }
-    .metric-card {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border: 1px solid #dee2e6;
+    
+    .status-info {
+        background: rgba(232, 170, 66, 0.1);
+        border-left: 3px solid var(--studio-accent);
+        padding: 1rem 1.5rem;
+        margin: 1rem 0;
+        border-radius: 2px;
     }
+    
+    /* Metrics Display */
+    .metric-group {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+    }
+    
+    .metric-item {
+        background: var(--studio-charcoal);
+        border: 1px solid var(--studio-border);
+        padding: 1.25rem;
+        border-radius: 2px;
+    }
+    
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--studio-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.5rem;
+    }
+    
+    .metric-value {
+        font-size: 1.5rem;
+        color: var(--studio-text);
+        font-weight: 300;
+    }
+    
+    /* Buttons */
+    .stButton>button {
+        background: var(--studio-accent);
+        color: #000;
+        border: none;
+        padding: 0.75rem 2rem;
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        transition: all 0.2s ease;
+        border-radius: 2px;
+    }
+    
+    .stButton>button:hover {
+        background: var(--studio-accent-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(232, 170, 66, 0.3);
+    }
+    
+    /* File Uploader */
+    .uploadedFile {
+        background: var(--studio-charcoal);
+        border: 1px solid var(--studio-border);
+    }
+    
+    /* Input Fields */
+    .stNumberInput>div>div>input {
+        background: var(--studio-charcoal);
+        border: 1px solid var(--studio-border);
+        color: var(--studio-text);
+        border-radius: 2px;
+    }
+    
+    /* Progress Bar */
+    .stProgress>div>div>div {
+        background-color: var(--studio-accent);
+    }
+    
+    /* Expander */
+    .streamlit-expanderHeader {
+        background: var(--studio-charcoal);
+        border: 1px solid var(--studio-border);
+        color: var(--studio-text);
+        border-radius: 2px;
+    }
+    
+    /* Divider */
+    hr {
+        border-color: var(--studio-border);
+        margin: 2rem 0;
+    }
+    
+    /* Sidebar Override */
+    section[data-testid="stSidebar"] {
+        background: var(--studio-charcoal);
+        border-right: 1px solid var(--studio-border);
+    }
+    
+    /* Hide Streamlit Branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -106,50 +258,59 @@ def initialize_session_state():
 
 
 def display_header():
-    """Display application header."""
-    st.markdown('<div class="main-header">🧵 Weaver AI Design Studio</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">Transform your designs into beautiful, production-ready fabric patterns</div>', unsafe_allow_html=True)
-    st.markdown("---")
+    """Display professional studio header."""
+    st.markdown('''
+    <div class="studio-header">
+        <div class="studio-logo">◆ WEAVER STUDIO</div>
+        <div class="studio-tagline">Professional Fabric Design & Pattern Engineering</div>
+    </div>
+    ''', unsafe_allow_html=True)
 
 
 def display_sidebar_info():
-    """Display information in sidebar."""
+    """Display professional sidebar information."""
     with st.sidebar:
-        st.image("https://via.placeholder.com/300x100/2E86AB/FFFFFF?text=Weaver+AI", width='stretch')
-        
-        st.markdown("### 🎨 How It Works")
+        st.markdown("### WORKFLOW")
         st.markdown("""
-        1. **Upload** your fabric design
-        2. **Review** pattern settings
-        3. **Process** with AI enhancement
-        4. **Download** production files
-        """)
+        <div style='color: #999; font-size: 0.9rem; line-height: 1.8;'>
+        <strong style='color: #e8aa42;'>01</strong> Import Design<br>
+        <strong style='color: #e8aa42;'>02</strong> Configure Parameters<br>
+        <strong style='color: #e8aa42;'>03</strong> Process Pattern<br>
+        <strong style='color: #e8aa42;'>04</strong> Export Production Files
+        </div>
+        """, unsafe_allow_html=True)
         
         st.markdown("---")
-        st.markdown("### 📖 Accepted File Types")
-        st.markdown("Upload high-quality images in:")
-        for fmt in LOSSLESS_INPUT_FORMATS:
-            st.markdown(f"- {fmt.upper().replace('.', '')} format")
-        st.info("💡 JPEG not supported - use PNG for best results")
+        st.markdown("### SPECIFICATIONS")
+        st.markdown("""
+        <div style='color: #999; font-size: 0.85rem; line-height: 1.6;'>
+        <strong>Supported Formats</strong><br>
+        PNG • TIFF • BMP<br><br>
+        <strong>Resolution</strong><br>
+        300-600 DPI recommended<br><br>
+        <strong>Max Dimensions</strong><br>
+        10,000 × 10,000 pixels
+        </div>
+        """, unsafe_allow_html=True)
         
         st.markdown("---")
-        st.markdown("### ℹ️ About")
-        st.markdown("""
-        Weaver AI uses advanced AI to refine your fabric designs
-        while ensuring they meet production requirements.
-        
-        Perfect for textile designers, manufacturers, and studios.
-        """)
+        st.markdown(f"""
+        <div style='color: #666; font-size: 0.75rem; margin-top: 2rem;'>
+        Weaver Studio v1.0<br>
+        © 2026 All Rights Reserved
+        </div>
+        """, unsafe_allow_html=True)
 
 
 def handle_image_upload():
-    """Handle image upload and display preview."""
-    st.markdown("## 📤 Upload Your Design")
+    """Handle image upload with professional interface."""
+    st.markdown('<div class="section-title">01 — Import Design</div>', unsafe_allow_html=True)
     
     uploaded_file = st.file_uploader(
-        "Choose your fabric design image",
+        "Select high-resolution fabric design",
         type=['png', 'tiff', 'tif', 'bmp'],
-        help="Upload PNG, TIFF, or BMP format. High resolution images work best."
+        help="Supported: PNG, TIFF, BMP | Recommended: 300+ DPI",
+        label_visibility="collapsed"
     )
     
     if uploaded_file is not None:
@@ -175,37 +336,60 @@ def handle_image_upload():
             del st.session_state.form_repeat_height
         
         # Auto-detect configuration immediately after upload
-        with st.spinner("🔍 Analyzing your design..."):
+        with st.spinner("Analyzing design properties..."):
             try:
                 detected = st.session_state.config_detector.detect_config(str(temp_file_path))
                 st.session_state.detected_config = detected
-                st.success(f"✅ Design loaded: {detected['image_width']}×{detected['image_height']} pixels at {detected['dpi']} DPI")
+                st.markdown(f'''
+                <div class="status-success">
+                    <strong>Design Loaded Successfully</strong><br>
+                    {detected['image_width']:,} × {detected['image_height']:,} px @ {detected['dpi']} DPI
+                </div>
+                ''', unsafe_allow_html=True)
             except Exception as e:
-                st.error(f"❌ Could not analyze image. Please try a different file.")
+                st.markdown('''
+                <div class="status-error">
+                    <strong>Analysis Failed</strong><br>
+                    Unable to process image. Please verify file integrity.
+                </div>
+                ''', unsafe_allow_html=True)
                 st.session_state.detected_config = None
         
-        # Display image preview
-        col1, col2 = st.columns([2, 1])
+        # Display image preview with metrics
+        st.markdown('<div class="section-title">Design Preview</div>', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns([3, 1])
         
         with col1:
-            st.markdown("### 🖼️ Preview")
             try:
                 img = Image.open(temp_file_path)
-                st.image(img, caption=uploaded_file.name, use_container_width=True)
+                st.image(img, use_container_width=True)
             except Exception as e:
-                st.error(f"Could not display preview")
+                st.error("Unable to render preview")
                 return False
         
         with col2:
-            st.markdown("### 📊 Design Details")
             try:
                 img = Image.open(temp_file_path)
-                st.markdown(f"**File:** {uploaded_file.name}")
-                st.markdown(f"**Format:** {img.format}")
-                st.markdown(f"**Dimensions:** {img.size[0]:,} × {img.size[1]:,} pixels")
-                st.markdown(f"**File Size:** {uploaded_file.size / 1024 / 1024:.1f} MB" if uploaded_file.size > 1024*1024 else f"**File Size:** {uploaded_file.size / 1024:.1f} KB")
+                file_size_mb = uploaded_file.size / (1024 * 1024)
+                
+                st.markdown(f"""
+                <div class="studio-card">
+                    <div class="metric-label">File Name</div>
+                    <div style="color: #e0e0e0; font-size: 0.9rem; margin-bottom: 1rem;">{uploaded_file.name}</div>
+                    
+                    <div class="metric-label">Format</div>
+                    <div style="color: #e0e0e0; font-size: 0.9rem; margin-bottom: 1rem;">{img.format}</div>
+                    
+                    <div class="metric-label">Dimensions</div>
+                    <div style="color: #e0e0e0; font-size: 0.9rem; margin-bottom: 1rem;">{img.size[0]:,} × {img.size[1]:,} px</div>
+                    
+                    <div class="metric-label">File Size</div>
+                    <div style="color: #e0e0e0; font-size: 0.9rem;">{file_size_mb:.2f} MB</div>
+                </div>
+                """, unsafe_allow_html=True)
             except Exception as e:
-                st.error(f"Could not read image details")
+                st.error("Unable to read metadata")
         
         return True
     
@@ -213,19 +397,15 @@ def handle_image_upload():
 
 
 def detect_and_display_config():
-    """Detect configuration from uploaded image and allow user to edit."""
+    """Professional configuration interface."""
     if st.session_state.uploaded_image_path is None:
         return None
     
-    st.markdown("---")
-    st.markdown("## ⚙️ Pattern Settings")
+    st.markdown('<div class="section-title">02 — Configure Parameters</div>', unsafe_allow_html=True)
     
     # Configuration should already be detected from upload
     if st.session_state.detected_config is not None:
         config = st.session_state.detected_config
-        
-        st.markdown("### 📐 Review Your Design Settings")
-        st.markdown('<div class="info-box">We automatically detected your image properties. You can adjust the repeat pattern size below.</div>', unsafe_allow_html=True)
         
         # Initialize widget values in session state if not already set
         if 'form_dpi' not in st.session_state:
@@ -240,21 +420,32 @@ def detect_and_display_config():
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### 📊 Image Properties")
+            st.markdown("#### Image Properties")
             
-            # Display detected properties
-            st.markdown(f"**Resolution:** {config['dpi']} DPI")
-            st.markdown(f"**Colors:** {config['color_mode']}")
-            st.markdown(f"**Size:** {config['image_width']:,} × {config['image_height']:,} px")
-            
-            st.caption("These values are automatically detected from your image.")
+            # Display detected properties in professional metrics format
+            st.markdown(f"""
+            <div class="metric-group">
+                <div class="metric-item">
+                    <div class="metric-label">Resolution</div>
+                    <div class="metric-value">{config['dpi']} <span style="font-size: 0.8rem; color: #999;">DPI</span></div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Color Mode</div>
+                    <div class="metric-value" style="font-size: 1.1rem;">{config['color_mode']}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Dimensions</div>
+                    <div class="metric-value" style="font-size: 1rem;">{config['image_width']:,} × {config['image_height']:,} <span style="font-size: 0.8rem; color: #999;">px</span></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
             
             # Store detected values for pipeline execution
             st.session_state.form_dpi = config['dpi']
             st.session_state.form_color_mode = config['color_mode']
         
         with col2:
-            st.markdown("#### 🔄 Pattern Repeat Size")
+            st.markdown("#### Pattern Repeat Configuration")
             
             # Repeat Width
             repeat_width = st.number_input(
@@ -264,7 +455,7 @@ def detect_and_display_config():
                 value=st.session_state.form_repeat_width,
                 step=1,
                 key='repeat_width_input',
-                help="How wide is one repeating pattern tile?"
+                help="Width of one complete pattern tile"
             )
             st.session_state.form_repeat_width = repeat_width
             
@@ -276,29 +467,39 @@ def detect_and_display_config():
                 value=st.session_state.form_repeat_height,
                 step=1,
                 key='repeat_height_input',
-                help="How tall is one repeating pattern tile?"
+                help="Height of one complete pattern tile"
             )
             st.session_state.form_repeat_height = repeat_height
         
-        # Display validation warnings
+        # Display validation status
         img_width = config.get('image_width', 0)
         img_height = config.get('image_height', 0)
         
         # Check tiling
         if img_width % repeat_width != 0 or img_height % repeat_height != 0:
-            st.markdown('<div class="warning-box">⚠️ <strong>Tiling Issue:</strong> Your repeat size doesn\'t divide evenly into the image. Please adjust the repeat dimensions for perfect tiling.</div>', unsafe_allow_html=True)
-            st.markdown(f"Current pattern would create {img_width / repeat_width:.1f} × {img_height / repeat_height:.1f} tiles (needs whole numbers)")
+            st.markdown(f'''
+            <div class="status-warning">
+                <strong>Tiling Configuration Issue</strong><br>
+                Current repeat dimensions do not tile evenly: {img_width / repeat_width:.2f} × {img_height / repeat_height:.2f} tiles<br>
+                <em>Adjust dimensions for seamless tiling (whole numbers required)</em>
+            </div>
+            ''', unsafe_allow_html=True)
         else:
             tiles_h = img_width // repeat_width
             tiles_v = img_height // repeat_height
-            st.markdown(f'<div class="success-box">✅ Perfect! Your pattern will tile seamlessly with {tiles_h} × {tiles_v} repeats.</div>', unsafe_allow_html=True)
+            st.markdown(f'''
+            <div class="status-success">
+                <strong>Seamless Tiling Verified</strong><br>
+                Pattern will tile perfectly with {tiles_h} × {tiles_v} repeats
+            </div>
+            ''', unsafe_allow_html=True)
         
-        # Display helpful suggestions
+        # Display suggestions in professional format
         suggestions = config.get('suggestions', [])
         if suggestions:
-            with st.expander("💡 Helpful Tips", expanded=False):
-                for suggestion in suggestions:
-                    st.markdown(f"- {suggestion}")
+            with st.expander("Optimization Recommendations", expanded=False):
+                for i, suggestion in enumerate(suggestions, 1):
+                    st.markdown(f"**{i}.** {suggestion}")
         
         # Build final config and store in session state
         final_config = {
@@ -319,17 +520,21 @@ def detect_and_display_config():
 
 
 def run_pipeline(config: Dict[str, Any]):
-    """Run the pipeline with the given configuration."""
-    st.markdown("---")
-    st.markdown("## 🚀 Step 3: Execute Pipeline")
+    """Run the pipeline with professional execution interface."""
+    st.markdown('<div class="section-title">03 — Process Pattern</div>', unsafe_allow_html=True)
     
     if config is None:
-        st.warning("⚠️ Please upload an image first. Configuration will be detected automatically.")
+        st.markdown('''
+        <div class="status-info">
+            <strong>Configuration Required</strong><br>
+            Complete steps 01 and 02 before processing.
+        </div>
+        ''', unsafe_allow_html=True)
         return
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("✨ Create Production Pattern", type="primary", use_container_width=True):
+        if st.button("EXECUTE PIPELINE", type="primary", use_container_width=True):
             
             # Use config from session state (most recent form values)
             pipeline_config = st.session_state.get('final_config', config)
@@ -340,7 +545,7 @@ def run_pipeline(config: Dict[str, Any]):
             
             try:
                 # Run pipeline
-                status_text.text("Processing your design...")
+                status_text.text("Initializing pipeline stages...")
                 progress_bar.progress(10)
                 
                 result = st.session_state.pipeline_service.execute_pipeline(
@@ -352,72 +557,91 @@ def run_pipeline(config: Dict[str, Any]):
                 )
                 
                 progress_bar.progress(100)
-                status_text.text("✅ Complete!")
+                status_text.text("Pipeline execution complete")
                 
                 st.session_state.pipeline_result = result
                 
-                st.balloons()
-                st.success("🎉 Your production-ready pattern is ready!")
+                st.markdown('''
+                <div class="status-success">
+                    <strong>Processing Complete</strong><br>
+                    Production-ready pattern generated successfully.
+                </div>
+                ''', unsafe_allow_html=True)
                 
             except Exception as e:
-                st.error(f"❌ Processing failed. Please check your image and try again.")
-                # Show simple error for users, hide technical details
-                with st.expander("Technical Details (for support)"):
-                    st.code(str(e))
+                st.markdown('''
+                <div class="status-error">
+                    <strong>Pipeline Execution Failed</strong><br>
+                    Verify input parameters and file integrity.
+                </div>
+                ''', unsafe_allow_html=True)
+                with st.expander("Error Details", expanded=False):
+                    st.code(str(e), language="text")
                 st.session_state.pipeline_result = None
 
 
 def update_progress(stage: int, message: str, progress_bar, status_text):
-    """Update progress indicators."""
+    """Update progress indicators with professional terminology."""
     stage_names = [
-        "Validating image",
-        "Optimizing quality", 
-        "Analyzing structure",
-        "AI enhancement",
-        "Perfecting repeat",
-        "Refining details",
-        "Adjusting colors",
-        "Final verification"
+        "Input validation",
+        "Quality normalization", 
+        "Structural analysis",
+        "Pattern recognition",
+        "Repeat enforcement",
+        "Detail refinement",
+        "Color calibration",
+        "Output verification"
     ]
     progress = min(10 + (stage + 1) * 11, 100)
     progress_bar.progress(progress)
     stage_name = stage_names[stage] if stage < len(stage_names) else "Processing"
-    status_text.text(f"⏳ {stage_name}...")
+    status_text.text(f"Stage {stage + 1}: {stage_name}...")
 
 
 def display_pipeline_results():
-    """Display pipeline execution results."""
+    """Display pipeline results with professional styling."""
     if st.session_state.pipeline_result is not None:
-        st.markdown("---")
-        st.markdown("## ✨ Your Pattern is Ready!")
+        st.markdown('<div class="section-title">04 — Export Production Files</div>', unsafe_allow_html=True)
         
         result = st.session_state.pipeline_result
         
-        # Success message
-        st.markdown('<div class="success-box">', unsafe_allow_html=True)
-        st.markdown("### 🎉 Processing Complete!")
-        st.markdown("Your fabric design has been transformed into a production-ready pattern.")
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Display key information in a simple format
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("### 📥 Download Your Pattern")
-            st.markdown("Your pattern files are ready for production.")
+            st.markdown("#### Export Options")
             
-            # Show download buttons (when artifacts are available)
-            st.button("📄 Download Pattern Files", disabled=True, help="Pattern export coming soon")
-            st.button("📊 Download Technical Report", disabled=True, help="Report export coming soon")
+            st.markdown("""
+            <div class="studio-card">
+                <div style="margin-bottom: 1rem;">
+                    <div class="metric-label">Pattern Files</div>
+                    <div style="color: #999; font-size: 0.85rem; margin-top: 0.5rem;">
+                    Production-ready vector patterns with complete technical specifications
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.button("EXPORT PATTERN FILES", disabled=True, use_container_width=True, help="Export functionality in development")
+            
+            st.markdown("""
+            <div class="studio-card" style="margin-top: 1rem;">
+                <div style="margin-bottom: 1rem;">
+                    <div class="metric-label">Technical Report</div>
+                    <div style="color: #999; font-size: 0.85rem; margin-top: 0.5rem;">
+                    Comprehensive analysis report with metrics and validation data
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.button("EXPORT TECHNICAL REPORT", disabled=True, use_container_width=True, help="Report export in development")
         
         with col2:
-            st.markdown("### 📋 Pattern Details")
+            st.markdown("#### Processing Summary")
             
-            # Show simple, client-friendly metrics
+            # Show professional metrics
             stage_outputs = result.get('stage_outputs', {})
             processing_steps = len(stage_outputs)
-            
-            st.markdown(f"**Processing Steps:** {processing_steps} completed")
             
             if 'created_at' in result:
                 created_at = result['created_at']
@@ -425,21 +649,37 @@ def display_pipeline_results():
                     created = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
                 else:
                     created = created_at
-                st.markdown(f"**Processed:** {created.strftime('%I:%M %p')}")
+                timestamp = created.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                timestamp = "N/A"
             
-            # Show reference ID (simplified)
-            pipeline_id = result.get('pipeline_id', 'N/A')[:8]
-            st.markdown(f"**Reference:** {pipeline_id}")
+            pipeline_id = result.get('pipeline_id', 'N/A')[:12]
+            
+            st.markdown(f"""
+            <div class="metric-group">
+                <div class="metric-item">
+                    <div class="metric-label">Stages Completed</div>
+                    <div class="metric-value">{processing_steps}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Processed</div>
+                    <div class="metric-value" style="font-size: 0.9rem;">{timestamp}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Pipeline ID</div>
+                    <div class="metric-value" style="font-size: 0.9rem; font-family: monospace;">{pipeline_id}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         
-        # Technical details for advanced users (collapsed by default)
-        with st.expander("🔧 Technical Details", expanded=False):
-            st.caption("For designers and technical teams")
-            
+        # Technical details for advanced users
+        with st.expander("Stage Execution Details", expanded=False):
+            st.markdown("**Pipeline Stages**")
             for stage_id in stage_outputs.keys():
-                stage_data = stage_outputs[stage_id]
-                st.markdown(f"**{stage_id}:** Completed")
+                st.markdown(f"- `{stage_id}`: Completed")
             
-            st.json(result, expanded=False)
+            with st.expander("Complete Result Data", expanded=False):
+                st.json(result, expanded=False)
 
 
 def main():
@@ -456,10 +696,19 @@ def main():
         run_pipeline(config)
         display_pipeline_results()
     else:
-        # Welcome message for new users
-        st.markdown("### 👋 Welcome to Weaver AI!")
-        st.markdown("Upload your fabric design to get started. We'll transform it into a production-ready pattern.")
-        st.info("💡 **Tip:** Use high-resolution PNG files for best results")
+        # Professional welcome screen
+        st.markdown("""
+        <div style="text-align: center; padding: 4rem 2rem; color: #999;">
+            <div style="font-size: 3rem; margin-bottom: 1rem; color: #e8aa42;">◆</div>
+            <div style="font-size: 1.2rem; font-weight: 300; letter-spacing: 0.1em; margin-bottom: 1rem;">
+                PROFESSIONAL FABRIC DESIGN WORKFLOW
+            </div>
+            <div style="font-size: 0.9rem; line-height: 1.8; max-width: 600px; margin: 0 auto;">
+                Import your high-resolution design to begin the production pipeline.<br>
+                Supports PNG, TIFF, and BMP formats at 300+ DPI for optimal results.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
