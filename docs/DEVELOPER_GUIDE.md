@@ -269,12 +269,12 @@ class StageXProcessor(BaseStage):
 
 **Symbolic IR Components**:
 1. **Motif Graph** - Nodes (strokes, junctions, islands) + Edges (connectivity)
-2. **Topology** - Connected component analysis (num_components, euler_characteristic)
+2. **Topology** - Connected component analysis (num_components, euler_characteristic, topology_well_formed)
 3. **Curve Intent** - Per-motif curve complexity `{low, medium, high}`
 4. **Pattern Intent** - Symmetry detection (rotational, reflective, translational)
 5. **Structural Masks** - Binary masks (edges, skeleton, regions) for debugging
 6. **Constraints** - Repeat boundary conditions, closure validation
-7. **Uncertainty** - Low-confidence elements (skeleton islands flagged as NOISE_CANDIDATE)
+7. **Uncertainty** - Low-confidence elements (skeleton islands flagged as NOISE_CANDIDATE role)
 
 **Config Parameters**:
 - `canny_low: int` - Canny low threshold (default: 50)
@@ -295,9 +295,10 @@ class StageXProcessor(BaseStage):
 
 **Key Features**:
 - Resolution-independent output (no pixel coordinates as truth)
-- Skeleton islands preserved as low-confidence NOISE_CANDIDATE nodes
+- Skeleton islands preserved as low-confidence nodes with NOISE_CANDIDATE role
 - KD-tree spatial indexing for junction-stroke matching
 - Explicit uncertainty tracking
+- **CRITICAL CONTRACT**: No field represents absolute pixel geometry or raster truth - all spatial info normalized to [0,1]
 
 **Failure Conditions**:
 - Edge detection produces no edges

@@ -159,11 +159,11 @@ StructuralIntentResult(
 ```python
 MotifNode(
     id: str,                           # Unique ID (e.g., "stroke_0", "junction_1", "island_2")
-    type: str,                         # "STROKE", "JUNCTION", "LOOP", "REGION", "BORDER", "NOISE_CANDIDATE"
+    type: Literal["STROKE", "JUNCTION", "LOOP", "REGION", "BORDER"],  # Structural ontology (NOISE_CANDIDATE is NOT a type)
     relative_scale: float,             # Scale normalized by diagonal (0-1)
     orientation: Optional[float],      # Radians (None if not applicable)
     confidence: float,                 # 0-1 (low for islands)
-    role: Optional[str],               # "NOISE_CANDIDATE" for skeleton islands
+    role: Optional[Literal["NOISE_CANDIDATE"]],  # Interpretation overlay for low-confidence skeleton islands
     centroid: Tuple[float, float],     # Relative position (0-1, 0-1)
     metadata: dict                     # Additional node-specific data
 )
@@ -410,7 +410,8 @@ TopologyInfo(
     component_count=int,
     junction_count=int,
     loop_count=int,
-    junction_types={"T": int, "Y": int, "X": int, "COMPLEX": int}
+    junction_types={"T": int, "Y": int, "X": int, "COMPLEX": int},
+    topology_well_formed=bool  # Graph internally consistent (not manufacturing validation)
 )
 ```
 

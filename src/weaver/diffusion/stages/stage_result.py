@@ -6,7 +6,7 @@ Each stage produces a Result that the next stage consumes.
 import json
 import numpy as np
 from pydantic import BaseModel, Field, model_serializer
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Literal
 from pathlib import Path
 
 class StageResult(BaseModel):
@@ -205,11 +205,11 @@ class CanonicalNormalizationResult(StageResult):
 class MotifNode(BaseModel):
     """Node in the motif graph representing a structural element."""
     id: str = Field(..., description="Unique node identifier")
-    type: str = Field(..., description="Node type: STROKE, LOOP, JUNCTION, REGION, BORDER, NOISE_CANDIDATE")
+    type: Literal["STROKE", "LOOP", "JUNCTION", "REGION", "BORDER"] = Field(..., description="Structural ontology type")
     relative_scale: float = Field(..., description="Scale normalized by image diagonal (0-1)")
     orientation: Optional[float] = Field(None, description="Orientation in radians (None if not applicable)")
     confidence: float = Field(..., description="Confidence score (0-1)")
-    role: Optional[str] = Field(None, description="Special role: NOISE_CANDIDATE for skeleton islands")
+    role: Optional[Literal["NOISE_CANDIDATE"]] = Field(None, description="Interpretation overlay: NOISE_CANDIDATE for low-confidence skeleton islands")
     centroid: Optional[tuple[float, float]] = Field(None, description="Relative centroid position (0-1, 0-1)")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional node metadata")
 
@@ -228,7 +228,7 @@ class TopologyInfo(BaseModel):
     junction_count: int = Field(..., description="Number of junction nodes")
     loop_count: int = Field(..., description="Number of detected loops")
     junction_types: Dict[str, int] = Field(default_factory=dict, description="Junction type counts: T, Y, X, COMPLEX")
-    connectivity_validated: bool = Field(..., description="Whether topology validation passed")
+    topology_well_formed: bool = Field(..., description="Whether graph structure is internally consistent (does not imply manufacturability)")
 
 class CurveIntent(BaseModel):
     """Curve classification and intent for a stroke."""
@@ -278,6 +278,10 @@ class StructuralIntentResult(StageResult):
     
     Resolution-independent symbolic representation of design structure.
     No pixel coordinates, no raster data - pure topology and constraints.
+    
+    CRITICAL CONTRACT: No field in this IR represents absolute pixel geometry or raster truth.
+    All spatial information is normalized to [0, 1] relative coordinates.
+    Downstream stages must not assume pixel-level precision from this IR.
     """
     # Graph representation (serialized)
     motif_nodes: list[MotifNode] = Field(default_factory=list, description="Motif graph nodes")

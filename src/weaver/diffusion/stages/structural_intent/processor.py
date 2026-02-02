@@ -549,7 +549,7 @@ class StructuralIntentStage(BaseStage):
             junction_count=len(junction_nodes),
             loop_count=loop_count,
             junction_types=dict(junction_types),
-            connectivity_validated=True
+            topology_well_formed=True
         )
     
     # ========================================================================
