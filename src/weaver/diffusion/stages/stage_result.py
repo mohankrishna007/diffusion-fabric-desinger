@@ -223,12 +223,22 @@ class MotifEdge(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional edge metadata")
 
 class TopologyInfo(BaseModel):
-    """Topology information extracted from skeleton."""
+    """Topology information extracted from skeleton.
+    
+    topology_well_formed=True guarantees:
+    - No self-loops in the graph
+    - No duplicate edges between same node pairs
+    - All non-NOISE_CANDIDATE nodes have degree >= 1
+    - Graph connectivity matches component_count
+    - Junction types are consistently classified
+    
+    This does NOT imply manufacturability or design correctness.
+    """
     component_count: int = Field(..., description="Number of connected components")
     junction_count: int = Field(..., description="Number of junction nodes")
     loop_count: int = Field(..., description="Number of detected loops")
     junction_types: Dict[str, int] = Field(default_factory=dict, description="Junction type counts: T, Y, X, COMPLEX")
-    topology_well_formed: bool = Field(..., description="Whether graph structure is internally consistent (does not imply manufacturability)")
+    topology_well_formed: bool = Field(..., description="Graph structure internally consistent per contract above")
 
 class CurveIntent(BaseModel):
     """Curve classification and intent for a stroke."""
@@ -241,21 +251,45 @@ class CurveIntent(BaseModel):
     confidence: float = Field(..., description="Classification confidence (0-1)")
 
 class PatternIntent(BaseModel):
-    """Symmetry and repetition pattern information."""
-    symmetry_type: Optional[str] = Field(None, description="Symmetry type: REFLECTION, ROTATIONAL, TRANSLATIONAL, NONE")
-    order: Optional[int] = Field(None, description="Symmetry order (k-fold for rotational)")
-    axis_angle: Optional[float] = Field(None, description="Reflection axis angle in radians")
-    tile_size_relative: Optional[tuple[float, float]] = Field(None, description="Relative tile size for translational (0-1, 0-1)")
-    offset_vector: Optional[tuple[float, float]] = Field(None, description="Relative offset vector for translational")
+    """Symmetry and repetition pattern information.
+    
+    Discriminated pattern detection - pattern_type determines which parameters are valid.
+    This prevents partial/incoherent pattern objects and makes Stage 3 consumption deterministic.
+    """
+    pattern_type: Literal["REFLECTION", "ROTATIONAL", "TRANSLATIONAL", "REPETITION", "NONE"] = Field(
+        ..., 
+        description="Pattern classification - determines valid parameter set"
+    )
+    # Pattern-specific parameters (validated by pattern_type)
+    order: Optional[int] = Field(None, description="Symmetry order (required for ROTATIONAL: k-fold)")
+    axis_angle: Optional[float] = Field(None, description="Reflection axis angle in radians (required for REFLECTION)")
+    tile_size_relative: Optional[tuple[float, float]] = Field(None, description="Relative tile size (required for TRANSLATIONAL/REPETITION: 0-1, 0-1)")
+    offset_vector: Optional[tuple[float, float]] = Field(None, description="Relative offset vector (required for TRANSLATIONAL)")
     confidence: float = Field(..., description="Pattern detection confidence (0-1)")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional pattern-specific data")
 
 class StructuralMask(BaseModel):
-    """Soft mask for structural regions."""
-    mask_type: str = Field(..., description="Mask type: FOREGROUND_STRUCTURE, ORNAMENTAL_FILL, NEGATIVE_SPACE, BORDER_EMPHASIS")
-    representation: str = Field(..., description="Representation: VECTOR_REGION or PROBABILITY_FIELD")
-    region_ids: list[str] = Field(default_factory=list, description="Associated region node IDs")
+    """Soft mask for structural regions (symbolic representation only).
+    
+    CRITICAL: StructuralMask is NOT a raster mask. It references symbolic regions
+    via region_ids. Any raster visualizations are debug-only and must not be
+    serialized or treated as IR truth.
+    
+    representation types:
+    - VECTOR_REGION: References to MotifNode region IDs (symbolic)
+    - PROBABILITY_FIELD: Confidence distribution over symbolic regions (not pixels)
+    """
+    mask_type: Literal["FOREGROUND_STRUCTURE", "ORNAMENTAL_FILL", "NEGATIVE_SPACE", "BORDER_EMPHASIS"] = Field(
+        ..., 
+        description="Structural mask classification"
+    )
+    representation: Literal["VECTOR_REGION", "PROBABILITY_FIELD"] = Field(
+        ..., 
+        description="Symbolic representation type (not raster)"
+    )
+    region_ids: list[str] = Field(default_factory=list, description="Associated region node IDs from motif graph")
     confidence: float = Field(..., description="Mask confidence (0-1)")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional mask metadata")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional symbolic mask metadata (not pixel data)")
 
 class DesignConstraint(BaseModel):
     """Inferred design-level constraint (advisory, not enforced)."""

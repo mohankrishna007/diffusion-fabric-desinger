@@ -411,7 +411,13 @@ TopologyInfo(
     junction_count=int,
     loop_count=int,
     junction_types={"T": int, "Y": int, "X": int, "COMPLEX": int},
-    topology_well_formed=bool  # Graph internally consistent (not manufacturing validation)
+    topology_well_formed=bool  # Explicit 5-point contract:
+        # 1. No self-loops in the graph
+        # 2. No duplicate edges between same node pairs
+        # 3. All non-NOISE_CANDIDATE nodes have degree >= 1
+        # 4. Graph connectivity matches component_count
+        # 5. Junction types are consistently classified
+        # Note: Does NOT guarantee manufacturability (Stage 3's job)
 )
 ```
 
@@ -477,7 +483,8 @@ for axis in ["vertical", "horizontal", "diagonal"]:
         pattern_intents.append(PatternIntent(
             pattern_type=f"SYMMETRY_{axis.upper()}",
             confidence=compute_confidence(matches),
-            affected_nodes=[...]
+            affected_nodes=[...],
+            metadata={"axis": axis, "match_count": len(matches)}
         ))
 ```
 
@@ -497,28 +504,34 @@ for axis in ["vertical", "horizontal", "diagonal"]:
 
 **Module**: `_generate_structural_masks()`
 
-**Purpose**: Create foreground, fill, and negative space masks
+**Purpose**: Create symbolic foreground, fill, and negative space representations
+
+**CRITICAL**: StructuralMask is NOT a raster mask. It is a symbolic descriptor
+of regions for Stage 3 consumption. Debug visualizations may show raster forms,
+but the IR itself contains symbolic region descriptions only.
 
 **Algorithm**:
 ```python
-# Foreground mask (all stroke pixels)
-foreground = np.zeros((height, width), dtype=np.uint8)
-for node in motif_nodes:
-    mark_node_pixels(foreground, node)
+# SYMBOLIC representation - NOT pixel-level masks
+# These describe regions, not store pixel arrays
 
-# Fill mask (enclosed regions)
-fill = extract_regions(edge_map)
+# Foreground: All motif boundary nodes
+foreground_nodes = [n for n in motif_nodes if n.type in ["STROKE", "BORDER"]]
 
-# Negative space mask (background)
-negative = cv2.bitwise_not(cv2.bitwise_or(foreground, fill))
+# Fill: Enclosed regions (detected via topology)
+fill_regions = extract_enclosed_regions(topology_info)
+
+# Negative space: Complement of foreground and fill
+negative_space = {"type": "complement", "of": ["foreground", "fill"]}
 ```
 
-**Output**: List of `StructuralMask` objects
+**Output**: List of `StructuralMask` objects (symbolic descriptors)
 ```python
 StructuralMask(
-    mask_type="FOREGROUND",  # or "FILL", "NEGATIVE_SPACE"
-    description="All motif boundary pixels",
-    coverage_fraction=float   # Fraction of image
+    mask_type="FOREGROUND_STRUCTURE",  # Literal: FOREGROUND_STRUCTURE | ORNAMENTAL_FILL | NEGATIVE_SPACE | BORDER_EMPHASIS
+    representation="VECTOR_REGION",    # Literal: VECTOR_REGION | PROBABILITY_FIELD
+    description="All motif boundary nodes (symbolic)",
+    coverage_fraction=float             # Estimated coverage (NOT pixel count)
 )
 ```
 
