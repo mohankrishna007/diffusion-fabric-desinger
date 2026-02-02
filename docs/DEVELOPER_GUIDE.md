@@ -269,12 +269,24 @@ class StageXProcessor(BaseStage):
 
 **Symbolic IR Components**:
 1. **Motif Graph** - Nodes (strokes, junctions, islands) + Edges (connectivity)
-2. **Topology** - Connected component analysis (num_components, euler_characteristic)
+2. **Topology** - Connected component analysis with explicit 5-point contract:
+   - `topology_well_formed=True` guarantees:
+     - No self-loops in the graph
+     - No duplicate edges between same node pairs
+     - All non-NOISE_CANDIDATE nodes have degree >= 1
+     - Graph connectivity matches component_count
+     - Junction types are consistently classified
 3. **Curve Intent** - Per-motif curve complexity `{low, medium, high}`
-4. **Pattern Intent** - Symmetry detection (rotational, reflective, translational)
-5. **Structural Masks** - Binary masks (edges, skeleton, regions) for debugging
+4. **Pattern Intent** - Discriminated pattern detection:
+   - `pattern_type`: Literal["REFLECTION", "ROTATIONAL", "TRANSLATIONAL", "REPETITION", "NONE"]
+   - Each pattern_type has specific required parameters (discriminated union)
+   - Prevents incoherent pattern objects (e.g., REFLECTION with tile_size)
+5. **Structural Masks** - Symbolic region descriptors (NOT raster masks):
+   - `mask_type`: Literal["FOREGROUND_STRUCTURE", "ORNAMENTAL_FILL", "NEGATIVE_SPACE", "BORDER_EMPHASIS"]
+   - `representation`: Literal["VECTOR_REGION", "PROBABILITY_FIELD"]
+   - Debug visualizations may show raster, but IR is symbolic
 6. **Constraints** - Repeat boundary conditions, closure validation
-7. **Uncertainty** - Low-confidence elements (skeleton islands flagged as NOISE_CANDIDATE)
+7. **Uncertainty** - Low-confidence elements (skeleton islands flagged as NOISE_CANDIDATE role)
 
 **Config Parameters**:
 - `canny_low: int` - Canny low threshold (default: 50)
@@ -295,9 +307,10 @@ class StageXProcessor(BaseStage):
 
 **Key Features**:
 - Resolution-independent output (no pixel coordinates as truth)
-- Skeleton islands preserved as low-confidence NOISE_CANDIDATE nodes
+- Skeleton islands preserved as low-confidence nodes with NOISE_CANDIDATE role
 - KD-tree spatial indexing for junction-stroke matching
 - Explicit uncertainty tracking
+- **CRITICAL CONTRACT**: No field represents absolute pixel geometry or raster truth - all spatial info normalized to [0,1]
 
 **Failure Conditions**:
 - Edge detection produces no edges

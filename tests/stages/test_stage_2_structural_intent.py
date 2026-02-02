@@ -1151,13 +1151,13 @@ class TestResolutionIndependence:
         
         result_2048 = stage.execute(result_2048_canonical, sample_pipeline_id + "_2048", {"symmetry_detection": "REQUIRED"})
         
-        # Extract symmetry types
-        symmetry_types_512 = [p.symmetry_type for p in result_512.pattern_intent]
-        symmetry_types_2048 = [p.symmetry_type for p in result_2048.pattern_intent]
+        # Extract pattern types
+        pattern_types_512 = [p.pattern_type for p in result_512.pattern_intent]
+        pattern_types_2048 = [p.pattern_type for p in result_2048.pattern_intent]
         
-        # CRITICAL TEST: Same symmetry types detected
-        assert set(symmetry_types_512) == set(symmetry_types_2048), \
-            f"Symmetry types differ: 512px={symmetry_types_512}, 2048px={symmetry_types_2048}"
+        # CRITICAL TEST: Same pattern types detected
+        assert set(pattern_types_512) == set(pattern_types_2048), \
+            f"Pattern types differ: 512px={pattern_types_512}, 2048px={pattern_types_2048}"
         
         # CRITICAL TEST: Same symmetry orders (for rotational)
         orders_512 = [p.order for p in result_512.pattern_intent if p.order is not None]

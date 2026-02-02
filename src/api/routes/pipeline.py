@@ -10,11 +10,16 @@ from weaver.shared.schemas import (
     PipelineExecutionResponse,
     PipelineSyncExecutionResponse,
     PipelineStatusResponse,
-    PipelineStatus
+    PipelineStatus,
+    ConfigValidationRequest,
+    ConfigValidationResponse,
+    ValidationErrorSchema
 )
 from weaver.shared.exceptions import PipelineExecutionError, WeaverError
+from weaver.shared.validators import validate_image_config
 from datetime import datetime
 import logging
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -278,6 +283,115 @@ async def list_stages():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list stages: {str(e)}"
+        )
+
+
+@router.post("/validate", 
+             response_model=ConfigValidationResponse,
+             responses={
+                 200: {
+                     "description": "Validation completed (check 'valid' field for pass/fail)",
+                     "model": ConfigValidationResponse
+                 },
+                 400: {
+                     "description": "Bad request - Invalid request format",
+                     "content": {
+                         "application/json": {
+                             "example": {
+                                 "detail": "Invalid base64 image data"
+                             }
+                         }
+                     }
+                 }
+             })
+async def validate_config(request: ConfigValidationRequest):
+    """
+    Validate image and configuration without executing pipeline.
+    
+    This endpoint provides pre-flight validation for UI/API clients:
+    - Detects DPI, color mode, and dimensions from image
+    - Validates provided configuration against Stage 0 requirements
+    - Suggests optimal repeat unit dimensions
+    - Returns structured errors for display in UI
+    
+    Use cases:
+    - Image upload: Detect properties and suggest configuration
+    - Form validation: Check config before execution
+    - Config-only: Validate DPI/color mode ranges without image
+    
+    Args:
+        request: Validation request with optional base64 image and config
+    
+    Returns:
+        Validation result with detection, suggestions, and errors
+    
+    Examples:
+        # Detect from image only
+        POST /api/v1/pipeline/validate
+        {
+            "image_data": "iVBORw0KGgoAAAANSUhEUgAAAAUA..."
+        }
+        
+        # Validate config with image
+        POST /api/v1/pipeline/validate
+        {
+            "image_data": "iVBORw0KGgoAAAANSUhEUgAAAAUA...",
+            "config": {
+                "dpi": 300,
+                "color_mode": "RGB",
+                "repeat_unit": {"width": 100, "height": 100}
+            }
+        }
+        
+        # Config-only validation
+        POST /api/v1/pipeline/validate
+        {
+            "config": {
+                "dpi": 5000,  # Will fail: exceeds MAX_DPI
+                "color_mode": "RGB"
+            }
+        }
+    """
+    try:
+        # Decode image if provided
+        image_data = None
+        if request.image_data:
+            try:
+                image_data = base64.b64decode(request.image_data)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid base64 image data: {str(e)}"
+                )
+        
+        # Perform validation
+        result = validate_image_config(
+            image_data=image_data,
+            config=request.config
+        )
+        
+        # Convert to response schema
+        return ConfigValidationResponse(
+            valid=result.valid,
+            detected=result.detected,
+            suggestions=result.suggestions,
+            errors=[
+                ValidationErrorSchema(
+                    field=error.field,
+                    error=error.error,
+                    value=error.value
+                )
+                for error in result.errors
+            ]
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Validation failed: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Validation error: {str(e)}"
         )
 
 

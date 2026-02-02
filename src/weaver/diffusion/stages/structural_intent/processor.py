@@ -549,7 +549,7 @@ class StructuralIntentStage(BaseStage):
             junction_count=len(junction_nodes),
             loop_count=loop_count,
             junction_types=dict(junction_types),
-            connectivity_validated=True
+            topology_well_formed=True
         )
     
     # ========================================================================
@@ -637,12 +637,13 @@ class StructuralIntentStage(BaseStage):
         
         if translation_confidence >= min_confidence:
             pattern_intents.append(PatternIntent(
-                symmetry_type="TRANSLATIONAL",
+                pattern_type="TRANSLATIONAL",
                 order=None,
                 axis_angle=None,
                 tile_size_relative=(repeat_w_rel, repeat_h_rel),
                 offset_vector=(repeat_w_rel, repeat_h_rel),
-                confidence=translation_confidence
+                confidence=translation_confidence,
+                metadata={"detected_tile_size": (repeat_w_rel, repeat_h_rel)}
             ))
         elif translation_confidence >= min_confidence * 0.6:
             # Ambiguous translational symmetry
@@ -662,12 +663,13 @@ class StructuralIntentStage(BaseStage):
         
         if reflection_confidence >= min_confidence:
             pattern_intents.append(PatternIntent(
-                symmetry_type="REFLECTION",
+                pattern_type="REFLECTION",
                 order=1,
                 axis_angle=0.0,  # Simplified: assume vertical axis
                 tile_size_relative=None,
                 offset_vector=None,
-                confidence=reflection_confidence
+                confidence=reflection_confidence,
+                metadata={"detected_axis": "vertical"}
             ))
         
         return pattern_intents, uncertainty_records
