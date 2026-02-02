@@ -1,6 +1,6 @@
 # Stage 0: Input Acquisition
 
-**Version**: 1.0.0  
+**Version**: 2.0.0  
 **Status**: Production Ready  
 **Test Coverage**: 93%
 
@@ -43,19 +43,17 @@ Stage 0 treats validation as **industrial infrastructure**, not experimental cod
 
 ### Sequential Validation Steps
 
-Stage 0 executes **9 validation steps** in strict order with **FAIL-FAST** semantics:
+Stage 0 executes **8 validation steps** in strict order with **FAIL-FAST** semantics:
 
 ```
-1. Schema Validation      → Pydantic validates all required fields exist
-2. Pre-Decode Guard       → File size check (OOM protection)
-3. Image Decode           → PIL decodes image, extracts metadata  
-4. Format Allowlist       → Reject JPEG/WEBP (lossy formats)
-5. Metadata Consistency   → Declared vs actual (DPI, color mode)
-6. Dimensional Checks     → Width/height/megapixels within limits
-7. Repeat Integrity       → Perfect tiling (width % repeat_w == 0)
-8. Resource Protection    → Post-decode pixel count validation
-9. Source-of-Truth Seal   → Compute SHA-256 hash
-10. Emit Descriptor       → Return canonical InputDescriptor
+1. Pre-Decode Guard       → File size check (OOM protection)
+2. Image Decode           → PIL decodes image, extracts metadata  
+3. Format Allowlist       → Reject JPEG/WEBP (lossy formats)
+4. Metadata Consistency   → Declared vs actual (DPI, color mode)
+5. Dimensional Checks     → Width/height/megapixels within limits
+6. Repeat Integrity       → Perfect tiling (width % repeat_w == 0)
+7. Resource Protection    → Post-decode pixel count validation
+8. Source-of-Truth Seal   → Compute SHA-256 hash + emit result
 ```
 
 Any failure at any step **immediately halts** the pipeline with a detailed exception.
@@ -64,36 +62,40 @@ Any failure at any step **immediately halts** the pipeline with a detailed excep
 
 ## Input Contract
 
-### Design Package Schema
+### Stage Execution API
+
+Stage 0 is executed via the `BaseStage.execute()` method:
 
 ```python
-Stage0Input(
-    pipeline_id: str,           # Unique pipeline execution ID
-    stage_number: int,          # Must be 0
-    image_path: str,            # Absolute path to raw image file
-    dpi: int,                   # Declared DPI (72-1200)
-    repeat_unit_px: RepeatUnit, # Repeat dimensions {width, height}
-    color_mode: str             # "RGB", "RGBA", "L", etc.
+stage.execute(
+    prev_result: None,                    # Stage 0 is first (no previous result)
+    pipeline_id: str,                     # Unique pipeline execution ID
+    config: dict                          # Pipeline configuration
 )
 ```
 
-### RepeatUnit Schema
+### Configuration Schema
 
 ```python
-RepeatUnit(
-    width: int,   # Repeat unit width in pixels (> 0)
-    height: int   # Repeat unit height in pixels (> 0)
-)
+config = {
+    'source_file': str | Path,            # REQUIRED: Path to raw image file
+    'dpi': int,                           # Declared DPI (default: 300)
+    'repeat_unit': {                      # Repeat dimensions (default: 100x100)
+        'width': int,                     # > 0
+        'height': int                     # > 0
+    },
+    'color_mode': str                     # "RGB", "RGBA", "L", "LA" (default: "RGB")
+}
 ```
 
-### Required Metadata
+### Required Fields
 
-All fields are **REQUIRED**. Missing metadata = immediate FAIL.
+Only **source_file** is strictly REQUIRED. Other fields have defaults.
 
-- **image_path**: Must exist, must be a file
-- **dpi**: Integer in range [72, 1200]
-- **repeat_unit_px**: Both width and height > 0
-- **color_mode**: Must be in {"RGB", "RGBA", "L", "LA"}
+- **source_file**: Must exist and be a valid file path
+- **dpi**: Integer in range [72, 1200] (default: 300)
+- **repeat_unit**: Both width and height > 0 (default: {width: 100, height: 100})
+- **color_mode**: Must be in {"RGB", "RGBA", "L", "LA"} (default: "RGB")
 
 **Forbidden Color Modes**:
 - **"P" (palette-indexed)**: Requires palette interpretation, creates CAM ambiguity
@@ -120,30 +122,38 @@ All fields are **REQUIRED**. Missing metadata = immediate FAIL.
 ### Success (PASS)
 
 ```python
-Stage0Output(
-    stage_number: 0,
-    status: StageStatus.COMPLETED,
-    message: "Input acquisition successful - design sealed as source of truth",
-    input_descriptor: InputDescriptor(
-        schema_version: "stage0.v1",
-        raw_hash: str,              # SHA-256 hash (64 hex chars)
-        image_path: str,            # Absolute resolved path
-        width_px: int,              # Validated image width
-        height_px: int,             # Validated image height
-        dpi: int,                   # Validated DPI
-        repeat_unit_px: dict,       # {"width": int, "height": int}
-        color_mode: str,            # Validated color mode
-        file_format: str,           # "PNG", "TIFF", or "BMP"
-        file_size_bytes: int,       # File size
-        bit_depth: int              # Bit depth per channel
-    ),
-    metrics: {
-        "validation_steps_passed": 10,
+InputAcquisitionResult(
+    pipeline_id: str,
+    stage_metadata: dict,           # Complete stage metadata with validation results
+    raw_hash: str,                  # SHA-256 hash (64 hex chars)
+    source_seal: dict,              # Immutability proof
+    image_path: str,                # Absolute resolved path
+    width_px: int,                  # Validated image width
+    height_px: int,                 # Validated image height
+    dpi: int,                       # Validated DPI
+    repeat_unit_px: dict,           # {"width": int, "height": int}
+    color_mode: str,                # Validated color mode
+    bit_depth: int                  # Bit depth per channel
+)
+```
+
+**Stage Metadata Structure:**
+```python
+stage_metadata = {
+    "stage_number": 0,
+    "stage_name": "Input Acquisition",
+    "status": "COMPLETED",
+    "pipeline_id": str,
+    "validation_results": {...},    # Results from each validation step
+    "metrics": {
+        "validation_steps_passed": 8,
         "pixel_count": int,
         "repeat_units_x": int,
-        "repeat_units_y": int
+        "repeat_units_y": int,
+        "file_format": str,
+        "file_size_bytes": int
     }
-)
+}
 ```
 
 ### Failure (FAIL)
@@ -167,45 +177,33 @@ raise InputFormatError(
 
 ## Validation Details
 
-### 1. Schema Validation
+### 1. Pre-Decode Resource Guard
 
-**Performed by**: Pydantic (automatic)
+**Performed by**: `pre_decode_guard.validate_pre_decode_resources()`
 
 **Checks**:
-- All required fields present
-- Field types correct (str, int, RepeatUnit)
-- DPI in range [72, 1200]
-- Repeat width/height > 0
-- Image path exists and is a file
-- Color mode in valid set: {"RGB", "RGBA", "L", "LA"}
+- Source file path is provided in config
+- Path exists and is a valid file
+- File is readable
 
-**Forbidden Modes**: "P" (palette-indexed), "1" (1-bit) - ambiguous for manufacturing
+**Exceptions**: `InputSchemaError`
 
-**Exceptions**: `InputSchemaError` (Pydantic ValidationError)
-
-```python
-# Palette-indexed rejection example
-details = {
-    "color_mode": "P",
-    "valid_modes": ["RGB", "RGBA", "L", "LA"],
-    "rationale": "Stage 0 requires unambiguous color representations. Palette-indexed (P) and 1-bit (1) modes create manufacturing ambiguity."
-}
-```
+This validation happens in `validate_input()` before `_execute()` runs.
 
 ---
 
-### 2. Pre-Decode Resource Guard
+### 2. Image Decode
 
-**Performed by**: `_validate_pre_decode_resources()`
+**Performed by**: `image_decoder.decode_image()`
 
-**Purpose**: Prevent OOM (Out-Of-Memory) before attempting PIL decode.
+**Purpose**: File size check before PIL decode (OOM protection).
 
 **Why this matters**:
 > "PIL can allocate more than 2× decoded image size during decoding, especially for TIFF. TIFF decompression buffers can spike memory usage to 4× or more. Checking file size BEFORE decode prevents system crashes from malicious or corrupted files."
 
 **Check**: File size must not exceed `MAX_FILE_SIZE_BYTES` (500 MB)
 
-**Fast-fail advantage**: Uses `os.path.getsize()` (stat only, no I/O). Rejects before allocating decode buffers.
+**Fast-fail advantage**: Uses `Path.stat()` (no full file read). Rejects before allocating decode buffers.
 
 **Exception**: `ResourceProtectionError`
 
@@ -218,28 +216,15 @@ details = {
 }
 ```
 
----
-
-### 3. Image Decode
-
-**Performed by**: PIL (Pillow)
-
-**Purpose**: Extract actual image properties to compare against declared metadata.
-
-**Extracted**:
-- Width, height (pixels)
-- Color mode (RGB, RGBA, L, etc.)
-- DPI metadata (if present in image file)
-- Bit depth per channel
-- File format
-
-**Exception**: `InputFormatError` if decode fails
+This is performed by the `pre_decode_guard` module in Step 1.
 
 ---
 
-### 4. Format Allowlist
+### 3. Format Allowlist
 
-**Check**: File extension must be in `LOSSLESS_INPUT_FORMATS`
+**Performed by**: `format_validator.validate_format_allowlist()`
+
+**Check**: File extension and PIL format must be in `LOSSLESS_INPUT_FORMATS`
 
 **Allowed**: `.bmp`, `.png`, `.tiff`, `.tif`
 
@@ -258,7 +243,9 @@ details = {
 
 ---
 
-### 5. Metadata Consistency
+### 4. Metadata Consistency
+
+**Performed by**: `metadata_validator.validate_metadata_consistency()`
 
 **Check**: Declared metadata matches actual image properties
 
@@ -305,7 +292,9 @@ details = {
 
 ---
 
-### 6. Dimensional Constraints
+### 5. Dimensional Constraints
+
+**Performed by**: `dimension_validator.validate_dimensions()`
 
 **Check**: Image dimensions within Jacquard loom physical limits
 
@@ -330,7 +319,9 @@ details = {
 
 ---
 
-### 7. Repeat Integrity
+### 6. Repeat Integrity
+
+**Performed by**: `repeat_validator.validate_repeat_integrity()`
 
 **Check**: Image dimensions are integer multiples of repeat unit
 
@@ -363,7 +354,9 @@ details = {
 
 ---
 
-### 8. Resource Protection (Post-Decode)
+### 7. Resource Protection (Post-Decode)
+
+**Performed by**: `resource_guard.validate_resource_limits()`
 
 **Check**: Pixel count within safe limits after successful decode
 
@@ -386,7 +379,7 @@ details = {
 
 ---
 
-### 9. Source-of-Truth Sealing
+### 8. Source-of-Truth Sealing
 
 **Action**: Compute SHA-256 hash of raw image bytes
 
@@ -405,18 +398,6 @@ def _compute_image_hash(self, image_path: str) -> str:
 **Result**: 64-character hexadecimal string (256 bits)
 
 **Usage**: Downstream stages can verify input hasn't changed by recomputing hash.
-
----
-
-### 10. Emit InputDescriptor
-
-**Action**: Create canonical `InputDescriptor` with all validated properties
-
-**Schema Version**: `"stage0.v1"` for forward compatibility
-
-**Immutability**: Pydantic `frozen=True` prevents modification
-
-**Fields**: All validated properties + SHA-256 hash + metrics
 
 ---
 
@@ -452,34 +433,32 @@ Every exception includes:
 ### Basic Usage
 
 ```python
-from weaver.stages.stage_0_input_acquisition.processor import (
-    Stage0InputAcquisition,
-    Stage0Input,
-    RepeatUnit
-)
+from weaver.diffusion.stages.input_acquisition.processor import InputAcquisitionStage
+from pathlib import Path
 
 # Create stage instance
-stage = Stage0InputAcquisition()
+stage = InputAcquisitionStage()
 
-# Prepare input
-input_data = Stage0Input(
-    pipeline_id="fab-2026-001",
-    stage_number=0,
-    image_path="/path/to/design.png",
-    dpi=300,
-    repeat_unit_px=RepeatUnit(width=200, height=200),
-    color_mode="RGB"
-)
+# Prepare configuration
+config = {
+    'source_file': "/path/to/design.png",
+    'dpi': 300,
+    'repeat_unit': {'width': 200, 'height': 200},
+    'color_mode': "RGB"
+}
 
-# Execute validation
+# Execute validation (prev_result is None for first stage)
 try:
-    output = stage.run(input_data)
+    result = stage.execute(
+        prev_result=None,
+        pipeline_id="fab-2026-001",
+        config=config
+    )
     
-    # Success - extract input descriptor
-    descriptor = output.input_descriptor
-    print(f"✅ Design validated: {descriptor.raw_hash}")
-    print(f"   Dimensions: {descriptor.width_px}×{descriptor.height_px}")
-    print(f"   Tiling: {output.metrics['repeat_units_x']}×{output.metrics['repeat_units_y']}")
+    # Success - access validated properties
+    print(f"✅ Design validated: {result.raw_hash}")
+    print(f"   Dimensions: {result.width_px}×{result.height_px}")
+    print(f"   Tiling: {result.stage_metadata['metrics']['repeat_units_x']}×{result.stage_metadata['metrics']['repeat_units_y']}")
     
 except InputFormatError as e:
     print(f"❌ Invalid format: {e.message}")
@@ -498,27 +477,32 @@ except ValidationError as e:
 
 ```python
 # After successful validation
-descriptor = output.input_descriptor
+result = stage.execute(prev_result=None, pipeline_id=..., config=...)
 
-# Image properties
-width = descriptor.width_px           # 1000
-height = descriptor.height_px         # 800
-dpi = descriptor.dpi                  # 300
-mode = descriptor.color_mode          # "RGB"
-format = descriptor.file_format       # "PNG"
+# Image properties (direct fields on result)
+width = result.width_px               # 1000
+height = result.height_px             # 800
+dpi = result.dpi                      # 300
+mode = result.color_mode              # "RGB"
+bit_depth = result.bit_depth          # 8
 
 # Repeat tiling
-repeat_w = descriptor.repeat_unit_px["width"]   # 200
-repeat_h = descriptor.repeat_unit_px["height"]  # 200
-tiles_x = output.metrics["repeat_units_x"]      # 5
-tiles_y = output.metrics["repeat_units_y"]      # 4
+repeat_w = result.repeat_unit_px["width"]       # 200
+repeat_h = result.repeat_unit_px["height"]      # 200
+
+# From stage metadata
+metrics = result.stage_metadata["metrics"]
+tiles_x = metrics["repeat_units_x"]            # 5
+tiles_y = metrics["repeat_units_y"]            # 4
+file_format = metrics["file_format"]           # "PNG"
+file_size = metrics["file_size_bytes"]        # File size
 
 # Immutability proof
-hash = descriptor.raw_hash  # SHA-256 (64 hex chars)
+hash = result.raw_hash                # SHA-256 (64 hex chars)
+seal = result.source_seal             # Complete seal info
 
-# File info
-size = descriptor.file_size_bytes     # File size in bytes
-path = descriptor.image_path          # Absolute resolved path
+# File path
+path = result.image_path              # Absolute resolved path
 ```
 
 ---
@@ -559,7 +543,7 @@ MAX_PIXEL_COUNT: Final[int] = 100_000_000
 
 - **38 test cases** (35 passing, 3 skipped for expense)
 - **93% code coverage** for Stage 0 processor
-- All 9 validation steps covered with failure scenarios
+- All 8 validation steps covered with failure scenarios
 
 ### Test Categories
 
@@ -606,7 +590,7 @@ pytest tests/stages/test_stage_0_input_acquisition.py -v
 pytest tests/stages/test_stage_0_input_acquisition.py::TestHappyPath -v
 
 # With coverage
-pytest tests/stages/test_stage_0_input_acquisition.py --cov=src/weaver/stages/stage_0_input_acquisition
+pytest tests/stages/test_stage_0_input_acquisition.py --cov=src/weaver/diffusion/stages/input_acquisition
 ```
 
 ---
@@ -703,32 +687,36 @@ If we auto-corrected issues:
 ### Orchestrator Flow
 
 ```python
-# Pipeline execution
-pipeline = PipelineEngine()
+from weaver.diffusion.pipeline_engine import DiffusionPipelineEngine
+from weaver.diffusion.stages.stage_loader import StageLoader
 
-# Stage 0 is first
-stage_0 = pipeline.load_stage(0)
-stage_0_input = Stage0Input(...)
+# Load stages
+loader = StageLoader()
+stage_0 = loader.load_stage(0)
+stage_1 = loader.load_stage(1)
 
 try:
-    stage_0_output = stage_0.run(stage_0_input)
-    
-    # Extract input descriptor
-    input_descriptor = stage_0_output.input_descriptor
-    
-    # Pass to Stage 1
-    stage_1_input = Stage1Input(
-        pipeline_id=stage_0_input.pipeline_id,
-        stage_number=1,
-        input_descriptor=input_descriptor,  # Trusted source of truth
-        ...
+    # Execute Stage 0
+    result_0 = stage_0.execute(
+        prev_result=None,
+        pipeline_id="pipeline-001",
+        config={
+            'source_file': "/path/to/design.png",
+            'dpi': 300,
+            'repeat_unit': {'width': 200, 'height': 200}
+        }
     )
-    stage_1_output = pipeline.load_stage(1).run(stage_1_input)
+    
+    # Pass Stage 0 result to Stage 1
+    result_1 = stage_1.execute(
+        prev_result=result_0,           # InputAcquisitionResult
+        pipeline_id="pipeline-001",
+        config=config
+    )
     
 except ValidationError as e:
     # Pipeline halts - Stage 0 failed
     logger.error(f"Stage 0 validation failed: {e.message}")
-    pipeline.mark_failed(e)
 ```
 
 ### Downstream Stage Trust
@@ -853,10 +841,12 @@ if scale < 1:
 
 ### Code Locations
 
-- **Implementation**: `src/weaver/stages/stage_0_input_acquisition/processor.py`
+- **Implementation**: `src/weaver/diffusion/stages/input_acquisition/processor.py`
+- **Sub-modules**: `src/weaver/diffusion/stages/input_acquisition/` (8 specialized validators)
+- **Result Schema**: `src/weaver/diffusion/stages/stage_result.py`
+- **Base Stage**: `src/weaver/diffusion/stages/base_stage.py`
 - **Exceptions**: `src/weaver/shared/exceptions.py`
 - **Constants**: `src/weaver/shared/constants.py`
-- **Schemas**: `src/weaver/shared/schemas.py`
 - **Tests**: `tests/stages/test_stage_0_input_acquisition.py`
 
 ### External Dependencies
