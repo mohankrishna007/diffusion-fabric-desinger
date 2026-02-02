@@ -30,6 +30,7 @@ from PIL import Image
 
 from weaver.shared.exceptions import MetadataConsistencyError
 from weaver.shared.logger import get_logger
+from weaver.shared.validators import detect_dpi, detect_color_mode
 
 logger = get_logger(__name__)
 

@@ -338,14 +338,31 @@ def handle_image_upload():
         # Auto-detect configuration immediately after upload
         with st.spinner("Analyzing design properties..."):
             try:
-                detected = st.session_state.config_detector.detect_config(str(temp_file_path))
-                st.session_state.detected_config = detected
+                result = st.session_state.config_detector.detect_and_validate(str(temp_file_path))
+                st.session_state.detected_config = result
+                
+                # Extract dimensions from result
+                dimensions = result.detected.get('dimensions', {})
+                width = dimensions.get('width', 0)
+                height = dimensions.get('height', 0)
+                dpi = result.detected.get('dpi', 300)
+                
                 st.markdown(f'''
                 <div class="status-success">
                     <strong>Design Loaded Successfully</strong><br>
-                    {detected['image_width']:,} × {detected['image_height']:,} px @ {detected['dpi']} DPI
+                    {width:,} × {height:,} px @ {dpi} DPI
                 </div>
                 ''', unsafe_allow_html=True)
+                
+                # Show validation errors if any
+                if not result.valid:
+                    st.markdown(f'''
+                    <div class="status-warning">
+                        <strong>Validation Warnings</strong><br>
+                        {len(result.errors)} issues detected - review configuration below
+                    </div>
+                    ''', unsafe_allow_html=True)
+                    
             except Exception as e:
                 st.markdown('''
                 <div class="status-error">
@@ -405,17 +422,25 @@ def detect_and_display_config():
     
     # Configuration should already be detected from upload
     if st.session_state.detected_config is not None:
-        config = st.session_state.detected_config
+        result = st.session_state.detected_config
+        
+        # Extract data from ValidationResult
+        detected_dpi = result.detected.get('dpi', 300)
+        detected_color_mode = result.detected.get('color_mode', 'RGB')
+        dimensions = result.detected.get('dimensions', {})
+        img_width = dimensions.get('width', 0)
+        img_height = dimensions.get('height', 0)
+        suggested_repeat = result.suggestions.get('repeat_unit', {'width': 100, 'height': 100})
         
         # Initialize widget values in session state if not already set
         if 'form_dpi' not in st.session_state:
-            st.session_state.form_dpi = config['dpi']
+            st.session_state.form_dpi = detected_dpi
         if 'form_color_mode' not in st.session_state:
-            st.session_state.form_color_mode = config['color_mode']
+            st.session_state.form_color_mode = detected_color_mode
         if 'form_repeat_width' not in st.session_state:
-            st.session_state.form_repeat_width = config.get('repeat_unit', {}).get('width', 100)
+            st.session_state.form_repeat_width = suggested_repeat.get('width', 100)
         if 'form_repeat_height' not in st.session_state:
-            st.session_state.form_repeat_height = config.get('repeat_unit', {}).get('height', 100)
+            st.session_state.form_repeat_height = suggested_repeat.get('height', 100)
         
         col1, col2 = st.columns(2)
         
@@ -427,22 +452,22 @@ def detect_and_display_config():
             <div class="metric-group">
                 <div class="metric-item">
                     <div class="metric-label">Resolution</div>
-                    <div class="metric-value">{config['dpi']} <span style="font-size: 0.8rem; color: #999;">DPI</span></div>
+                    <div class="metric-value">{detected_dpi} <span style="font-size: 0.8rem; color: #999;">DPI</span></div>
                 </div>
                 <div class="metric-item">
                     <div class="metric-label">Color Mode</div>
-                    <div class="metric-value" style="font-size: 1.1rem;">{config['color_mode']}</div>
+                    <div class="metric-value" style="font-size: 1.1rem;">{detected_color_mode}</div>
                 </div>
                 <div class="metric-item">
                     <div class="metric-label">Dimensions</div>
-                    <div class="metric-value" style="font-size: 1rem;">{config['image_width']:,} × {config['image_height']:,} <span style="font-size: 0.8rem; color: #999;">px</span></div>
+                    <div class="metric-value" style="font-size: 1rem;">{img_width:,} × {img_height:,} <span style="font-size: 0.8rem; color: #999;">px</span></div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
             # Store detected values for pipeline execution
-            st.session_state.form_dpi = config['dpi']
-            st.session_state.form_color_mode = config['color_mode']
+            st.session_state.form_dpi = detected_dpi
+            st.session_state.form_color_mode = detected_color_mode
         
         with col2:
             st.markdown("#### Pattern Repeat Configuration")
@@ -472,10 +497,6 @@ def detect_and_display_config():
             st.session_state.form_repeat_height = repeat_height
         
         # Display validation status
-        img_width = config.get('image_width', 0)
-        img_height = config.get('image_height', 0)
-        
-        # Check tiling
         if img_width % repeat_width != 0 or img_height % repeat_height != 0:
             st.markdown(f'''
             <div class="status-warning">
@@ -494,12 +515,22 @@ def detect_and_display_config():
             </div>
             ''', unsafe_allow_html=True)
         
-        # Display suggestions in professional format
-        suggestions = config.get('suggestions', [])
-        if suggestions:
-            with st.expander("Optimization Recommendations", expanded=False):
-                for i, suggestion in enumerate(suggestions, 1):
-                    st.markdown(f"**{i}.** {suggestion}")
+        # Display validation errors if any
+        if result.errors:
+            with st.expander("⚠️ Validation Issues", expanded=True):
+                for error in result.errors:
+                    st.markdown(f"- **{error.field}**: {error.error}")
+        
+        # Display suggestions in professional format (if available from tiles)
+        tiles_info = result.suggestions.get('tiles', {})
+        if tiles_info:
+            with st.expander("✅ Pattern Analysis", expanded=False):
+                st.markdown(f"""
+                - Suggested repeat creates **{tiles_info.get('x')} × {tiles_info.get('y')}** tiles
+                - Total of **{tiles_info.get('total')}** complete pattern repeats
+                - Detected DPI: **{detected_dpi}** (from image metadata)
+                - Color mode: **{detected_color_mode}**
+                """)
         
         # Build final config and store in session state
         final_config = {

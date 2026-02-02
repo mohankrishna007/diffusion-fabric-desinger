@@ -13,6 +13,7 @@ from weaver import DiffusionPipelineEngine
 from weaver.shared.config_loader import load_pipeline_config
 from weaver.shared.exceptions import PipelineExecutionError, ValidationError
 from weaver.shared.schemas import PipelineStatus
+from weaver.shared.validators import validate_image_config
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +225,10 @@ class DiffusionPipelineService:
         """
         Validate pipeline configuration without executing.
         
+        Performs comprehensive pre-flight validation using shared validators.
+        This provides the same validation that Stage 0 will perform, but
+        earlier in the process for better user feedback.
+        
         Args:
             source_file: Path to input image
             config: Configuration to validate
@@ -232,34 +237,21 @@ class DiffusionPipelineService:
             Validation result:
             {
                 "valid": bool,
-                "errors": list[str],
-                "warnings": list[str]
+                "detected": dict,
+                "suggestions": dict,
+                "errors": list[dict]  # [{field, error, value}]
             }
         """
-        errors = []
-        warnings = []
+        logger.debug(f"Validating config for {source_file}")
         
-        # Validate source file
-        if not Path(source_file).exists():
-            errors.append(f"Source file does not exist: {source_file}")
+        # Use shared validators for comprehensive validation
+        result = validate_image_config(
+            image_path=source_file,
+            config=config
+        )
         
-        # Validate required config fields (Stage 0 requirements)
-        if "dpi" not in config and "dpi" not in self.config.get("global", {}).get("manufacturing", {}):
-            errors.append("Missing required field: dpi")
-        
-        if "color_mode" not in config:
-            warnings.append("Missing optional field: color_mode (will use default)")
-        
-        if "repeat_unit" not in config:
-            warnings.append("Missing optional field: repeat_unit (will auto-detect)")
-        
-        is_valid = len(errors) == 0
-        
-        return {
-            "valid": is_valid,
-            "errors": errors,
-            "warnings": warnings
-        }
+        # Convert to dict for compatibility
+        return result.to_dict()
     
     def get_config_info(self) -> Dict[str, Any]:
         """

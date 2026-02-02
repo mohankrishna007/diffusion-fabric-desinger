@@ -163,6 +163,82 @@ class PipelineStatusResponse(BaseModel):
 
 
 # ============================================================================
+# VALIDATION SCHEMAS
+# For pre-flight validation endpoint and UI/API error handling
+# ============================================================================
+
+class ValidationErrorSchema(BaseModel):
+    """Structured validation error."""
+    field: str = Field(..., description="Field name that failed validation")
+    error: str = Field(..., description="Error message")
+    value: Optional[Any] = Field(None, description="Invalid value that caused the error")
+
+
+class ConfigValidationRequest(BaseModel):
+    """Request schema for configuration validation endpoint."""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "image_data": "iVBORw0KGgoAAAANSUhEUgAAAAUA...",
+                "config": {
+                    "dpi": 300,
+                    "color_mode": "RGB",
+                    "repeat_unit": {
+                        "width": 100,
+                        "height": 100
+                    }
+                }
+            }
+        }
+    )
+    
+    image_data: Optional[str] = Field(
+        None,
+        description="Base64-encoded image data (optional - provide either image_data or validate config only)"
+    )
+    config: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Configuration to validate (dpi, color_mode, repeat_unit)"
+    )
+
+
+class ConfigValidationResponse(BaseModel):
+    """Response schema for configuration validation endpoint."""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "valid": True,
+                "detected": {
+                    "dpi": 300,
+                    "color_mode": "RGB",
+                    "dimensions": {"width": 1000, "height": 1000},
+                    "actual_color_mode": "RGB"
+                },
+                "suggestions": {
+                    "repeat_unit": {"width": 200, "height": 200},
+                    "tiles": {"x": 5, "y": 5, "total": 25}
+                },
+                "errors": []
+            }
+        }
+    )
+    
+    valid: bool = Field(..., description="Whether validation passed")
+    detected: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Auto-detected properties from image (dpi, color_mode, dimensions)"
+    )
+    suggestions: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Suggested configuration values (repeat_unit, tiles)"
+    )
+    errors: list[ValidationErrorSchema] = Field(
+        default_factory=list,
+        description="List of validation errors (empty if valid=true)"
+    )
+
+
+# ============================================================================
 # STAGE 1 - CANONICAL NORMALIZATION SCHEMAS
 # Deterministic internal representation for manufacturing pipeline
 # ============================================================================
